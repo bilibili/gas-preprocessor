@@ -401,8 +401,6 @@ my @irp_args;
 my $irp_param;
 
 # pass 2: parse .rept and .if variants
-# NOTE: since we don't implement a proper parser, using .rept with a
-# variable assigned from .set is not supported
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
     if ($line =~ /\.(section|text|const_data)/) {
@@ -486,7 +484,7 @@ foreach my $line (@pass1_lines) {
         if ($num_repts =~ s/(\.\w+.*)//) {
             push(@rept_lines, "$1\n");
         }
-        $num_repts = eval($num_repts);
+        $num_repts = eval_expr($num_repts);
     } elsif ($line =~ /\.irp\s+([\d\w\.]+)\s*(.*)/) {
         $in_irp = 1;
         $num_repts = 1;
