@@ -471,7 +471,7 @@ foreach my $line (@pass1_lines) {
     if ($fix_unreq) {
         if ($line =~ /\.unreq\s+(.*)/) {
             $line = ".unreq " . lc($1) . "\n";
-            print ASMFILE ".unreq " . uc($1) . "\n";
+            $line .= ".unreq " . uc($1) . "\n";
         }
     }
 
