@@ -260,6 +260,13 @@ sub parse_line {
     }
 }
 
+sub handle_set {
+    my $line = $_[0];
+    if ($line =~ /\.set\s+(.*),\s*(.*)/) {
+        $symbols{$1} = eval_expr($2);
+    }
+}
+
 sub expand_macros {
     my $line = @_[0];
 
@@ -288,9 +295,7 @@ sub expand_macros {
 
     $line =~ s/\%([^,]*)/eval_expr($1)/eg if $altmacro;
 
-    if ($line =~ /\.set\s+(.*),\s*(.*)/) {
-        $symbols{$1} = eval_expr($2);
-    }
+    handle_set($line);
 
     if ($line =~ /(\S+:|)\s*([\w\d\.]+)\s*(.*)/ && exists $macro_lines{$2}) {
         push(@pass1_lines, $1);
