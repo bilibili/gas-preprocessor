@@ -224,7 +224,7 @@ sub parse_line {
             $current_macro = '';
             return;
         }
-    } elsif (/\.irp/) {
+    } elsif (/\.irp/ or /\.rept/) {
         $in_irp = 1;
     } elsif (/.endr/) {
         $in_irp = 0;
@@ -521,7 +521,9 @@ foreach my $line (@pass1_lines) {
         } else {
             for (1 .. $num_repts) {
                 foreach my $line (@rept_lines) {
-                    print ASMFILE $line;
+                    if (!parse_if_line($line) && !handle_if($line)) {
+                        print ASMFILE $line;
+                    }
                 }
             }
         }
