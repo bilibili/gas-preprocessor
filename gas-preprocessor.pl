@@ -519,6 +519,7 @@ foreach my $line (@pass1_lines) {
                     $line =~ s/\\$irp_param/$i/g;
                     $line =~ s/\\\(\)//g;     # remove \()
                     if (!parse_if_line($line) && !handle_if($line)) {
+                        handle_set($line);
                         print ASMFILE $line;
                     }
                 }
@@ -527,6 +528,7 @@ foreach my $line (@pass1_lines) {
             for (1 .. $num_repts) {
                 foreach my $line (@rept_lines) {
                     if (!parse_if_line($line) && !handle_if($line)) {
+                        handle_set($line);
                         print ASMFILE $line;
                     }
                 }
@@ -538,6 +540,7 @@ foreach my $line (@pass1_lines) {
     } elsif (scalar(@rept_lines)) {
         push(@rept_lines, $line);
     } else {
+        handle_set($line);
         print ASMFILE $line;
     }
 }
