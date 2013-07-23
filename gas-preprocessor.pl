@@ -179,7 +179,7 @@ sub parse_if_line {
 
     # evaluate .if blocks
     if (scalar(@ifstack)) {
-        if (/\.endif/) {
+        if ($line =~ /\.endif/) {
             pop(@ifstack);
             return 1;
         } elsif ($line =~ /\.elseif\s+(.*)/) {
@@ -189,7 +189,7 @@ sub parse_if_line {
                 $ifstack[-1] = -$ifstack[-1];
             }
             return 1;
-        } elsif (/\.else/) {
+        } elsif ($line =~ /\.else/) {
             $ifstack[-1] = !$ifstack[-1];
             return 1;
         } elsif (handle_if($line)) {
@@ -513,7 +513,6 @@ foreach my $line (@pass1_lines) {
                     my $line = $origline;
                     $line =~ s/\\$irp_param/$i/g;
                     $line =~ s/\\\(\)//g;     # remove \()
-                    $_ = $line;
                     if (!parse_if_line($line) && !handle_if($line)) {
                         print ASMFILE $line;
                     }
