@@ -109,14 +109,14 @@ while (<ASMFILE>) {
     s/(?<!\\)$comm.*//x;
 
     # comment out unsupported directives
-    s/\.type/$comm.type/x;
-    s/\.func/$comm.func/x;
-    s/\.endfunc/$comm.endfunc/x;
-    s/\.ltorg/$comm.ltorg/x;
-    s/\.size/$comm.size/x;
-    s/\.fpu/$comm.fpu/x;
-    s/\.arch/$comm.arch/x;
-    s/\.object_arch/$comm.object_arch/x;
+    s/\.type/$comm$&/x;
+    s/\.func/$comm$&/x;
+    s/\.endfunc/$comm$&/x;
+    s/\.ltorg/$comm$&/x;
+    s/\.size/$comm$&/x;
+    s/\.fpu/$comm$&/x;
+    s/\.arch/$comm$&/x;
+    s/\.object_arch/$comm$&/x;
 
     # the syntax for these is a little different
     s/\.global/.globl/x;
