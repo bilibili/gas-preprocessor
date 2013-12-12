@@ -450,6 +450,13 @@ foreach my $line (@pass1_lines) {
         %literal_labels = ();
     }
 
+    # handle GNU as pc-relative relocations for adrp/add
+    if ($line =~ /(.*)\s*adrp([\w\s\d]+)\s*,\s*#:pg_hi21:([^\s]+)/) {
+        $line = "$1 adrp$2, ${3}\@PAGE\n";
+    } elsif ($line =~ /(.*)\s*add([\w\s\d]+)\s*,([\w\s\d]+)\s*,\s*#:lo12:([^\s]+)/) {
+        $line = "$1 add$2, $3, ${4}\@PAGEOFF\n";
+    }
+
     # thumb add with large immediate needs explicit add.w
     if ($thumb and $line =~ /add\s+.*#([^@]+)/) {
         $line =~ s/add/add.w/ if eval_expr($1) > 255;
