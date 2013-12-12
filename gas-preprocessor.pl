@@ -51,7 +51,9 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
 my $comm;
 
 # detect architecture from gcc binary name
-if      ($gcc_cmd[0] =~ /arm/) {
+if      ($gcc_cmd[0] =~ /arm64|aarch64/) {
+    $comm = '//';
+} elsif ($gcc_cmd[0] =~ /arm/) {
     $comm = '@';
 } elsif ($gcc_cmd[0] =~ /powerpc|ppc/) {
     $comm = '#';
@@ -60,7 +62,9 @@ if      ($gcc_cmd[0] =~ /arm/) {
 # look for -arch flag
 foreach my $i (1 .. $#gcc_cmd-1) {
     if ($gcc_cmd[$i] eq "-arch") {
-        if ($gcc_cmd[$i+1] =~ /arm/) {
+        if      ($gcc_cmd[$i+1] =~ /arm64|aarch64/) {
+            $comm = '//';
+        } elsif ($gcc_cmd[$i+1] =~ /arm/) {
             $comm = '@';
         } elsif ($gcc_cmd[$i+1] =~ /powerpc|ppc/) {
             $comm = '#';
@@ -71,7 +75,9 @@ foreach my $i (1 .. $#gcc_cmd-1) {
 # assume we're not cross-compiling if no -arch or the binary doesn't have the arch name
 if (!$comm) {
     my $native_arch = qx/arch/;
-    if ($native_arch =~ /arm/) {
+    if      ($native_arch =~ /arm64|aarch64/) {
+        $comm = '//';
+    } elsif ($native_arch =~ /arm/) {
         $comm = '@';
     } elsif ($native_arch =~ /powerpc|ppc/) {
         $comm = '#';
