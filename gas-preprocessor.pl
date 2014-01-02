@@ -40,7 +40,7 @@ command. Following options are currently supported:
 
     -help         - this usage text
     -arch         - target architecture
-    -as-type      - one value out of {,apple-}{gas,clang}
+    -as-type      - one value out of {{,apple-}{gas,clang},armasm}
     -fix-unreq
     -no-fix-unreq
 ";
@@ -79,7 +79,7 @@ while (@options) {
         die "unknown arch: '$arch'\n" if not exists $comments{$arch};
     } elsif ($opt eq "-as-type") {
         $as_type = shift @options;
-        die "unknown as type: '$as_type'\n" if $as_type !~ /^(apple-)?(gas|clang)$/;
+        die "unknown as type: '$as_type'\n" if $as_type !~ /^((apple-)?(gas|clang)|armasm)$/;
     } elsif ($opt eq "-help") {
         usage();
         exit 0;
@@ -103,6 +103,25 @@ if (grep /\.c$/, @gcc_cmd) {
 } else {
     die "Unrecognized input filetype";
 }
+if ($as_type eq "armasm") {
+
+    $preprocess_c_cmd[0] = "cpp";
+
+    @preprocess_c_cmd = grep ! /^-nologo$/, @preprocess_c_cmd;
+    # Remove -ignore XX parameter pairs from preprocess_c_cmd
+    my $index = 1;
+    while ($index < $#preprocess_c_cmd) {
+        if ($preprocess_c_cmd[$index] eq "-ignore" and $index + 1 < $#preprocess_c_cmd) {
+            splice(@preprocess_c_cmd, $index, 2);
+            next;
+        }
+        $index++;
+    }
+    if (grep /^-MM$/, @preprocess_c_cmd) {
+        system(@preprocess_c_cmd) == 0 or die "Error running preprocessor";
+        exit 0;
+    }
+}
 
 # if compiling, avoid creating an output file named '-.o'
 if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
@@ -116,8 +135,27 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
         }
     }
 }
-@gcc_cmd = map { /\.[csS]$/ ? qw(-x assembler -) : $_ } @gcc_cmd;
 @preprocess_c_cmd = map { /\.o$/ ? "-" : $_ } @preprocess_c_cmd;
+my $tempfile;
+if ($as_type ne "armasm") {
+    @gcc_cmd = map { /\.[csS]$/ ? qw(-x assembler -) : $_ } @gcc_cmd;
+} else {
+    @preprocess_c_cmd = grep ! /^-c$/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-m/, @preprocess_c_cmd;
+
+    my @outfiles = grep /\.o$/, @gcc_cmd;
+    $tempfile = $outfiles[0].".asm";
+
+    # Remove most parameters from gcc_cmd, which actually is the armasm command,
+    # which doesn't support any of the common compiler/preprocessor options.
+    @gcc_cmd = grep ! /^-D/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-U/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-m/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-M/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-c$/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-I/, @gcc_cmd;
+    @gcc_cmd = map { /\.S$/ ? $tempfile : $_ } @gcc_cmd;
+}
 
 # detect architecture from gcc binary name
 if (!$arch) {
@@ -167,23 +205,52 @@ my %symbols;
 while (<ASMFILE>) {
     # remove all comments (to avoid interfering with evaluating directives)
     s/(?<!\\)$comm.*//x;
+    # Strip out windows linefeeds
+    s/\r$//;
+    # Strip out line number comments - armasm can handle them in a separate
+    # syntax, but since the line numbers are off they are only misleading.
+    s/^#\s+(\d+).*//          if $as_type =~ /armasm/;
 
     # comment out unsupported directives
-    s/\.type/$comm$&/x        if $as_type =~ /^apple-/;
+    s/\.type/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
     s/\.func/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
     s/\.endfunc/$comm$&/x     if $as_type =~ /^(apple-|clang)/;
-    s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang)/;
-    s/\.size/$comm$&/x        if $as_type =~ /^apple-/;
-    s/\.fpu/$comm$&/x         if $as_type =~ /^apple-/;
-    s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
-    s/\.object_arch/$comm$&/x if $as_type =~ /^apple-/;
+    s/\.endfunc/ENDP/x        if $as_type =~ /armasm/;
+    s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang|armasm)/;
+    s/\.size/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
+    s/\.fpu/$comm$&/x         if $as_type =~ /^(apple-|armasm)/;
+    s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang|armasm)/;
+    s/\.object_arch/$comm$&/x if $as_type =~ /^(apple-|armasm)/;
 
-    # the syntax for these is a little different
-    s/\.global/.globl/x       if $as_type =~ /apple-/;
-    # also catch .section .rodata since the equivalent to .const_data is .section __DATA,__const
-    s/(.*)\.rodata/.const_data/x if $as_type =~ /apple-/;
-    s/\.int/.long/x;
-    s/\.float/.single/x;
+    s/\.syntax/$comm$&/x      if $as_type =~ /armasm/;
+    # armasm uses a different comment character. We don't want to change
+    # $comm originally since that matches what the input source uses.
+    s/$comm/;/                if $as_type =~ /armasm/;
+
+    if ($as_type =~ /^apple-/) {
+        # the syntax for these is a little different
+        s/\.global/.globl/x;
+        # also catch .section .rodata since the equivalent to .const_data is .section __DATA,__const
+        s/(.*)\.rodata/.const_data/x;
+        s/\.int/.long/x;
+        s/\.float/.single/x;
+    }
+    if ($as_type eq "armasm") {
+        s/\.global/EXPORT/x;
+        s/\.int/dcd/x;
+        s/\.long/dcd/x;
+        s/\.float/dcfs/x;
+        s/\.word/dcd/x;
+        s/\.short/dcw/x;
+        s/\.byte/dcb/x;
+        # The alignment in AREA is the power of two, just as .align in gas
+        s/\.text/AREA |.text|, CODE, READONLY, ALIGN=2, CODEALIGN/;
+        s/(.*)\.rodata/AREA |.rodata|, DATA, READONLY, ALIGN=5/;
+
+        s/fmxr/vmsr/;
+        s/fmrx/vmrs/;
+        s/fadds/vadd/;
+    }
 
     # catch unknown section names that aren't mach-o style (with a comma)
     if ($as_type =~ /apple-/ and /.section ([^,]*)$/) {
@@ -327,7 +394,9 @@ sub handle_set {
     my $line = $_[0];
     if ($line =~ /\.set\s+(.*),\s*(.*)/) {
         $symbols{$1} = eval_expr($2);
+        return 1;
     }
+    return 0;
 }
 
 sub expand_macros {
@@ -450,7 +519,11 @@ close(ASMFILE) or exit 1;
 if ($ENV{GASPP_DEBUG}) {
     open(ASMFILE, ">&STDOUT");
 } else {
-    open(ASMFILE, "|-", @gcc_cmd) or die "Error running assembler";
+    if ($as_type ne "armasm") {
+        open(ASMFILE, "|-", @gcc_cmd) or die "Error running assembler";
+    } else {
+        open(ASMFILE, ">", $tempfile);
+    }
 }
 
 my @sections;
@@ -466,12 +539,19 @@ my $thumb = 0;
 
 my %thumb_labels;
 my %call_targets;
+my %mov32_targets;
 
 my @irp_args;
 my $irp_param;
 
 my %neon_alias_reg;
 my %neon_alias_type;
+
+my $temp_label_next = 0;
+my %last_temp_labels;
+my %next_temp_labels;
+
+my %labels_seen;
 
 my %aarch64_req_alias;
 
@@ -491,8 +571,13 @@ foreach my $line (@pass1_lines) {
     $thumb = 1 if $line =~ /\.code\s+16|\.thumb/;
     $thumb = 0 if $line =~ /\.code\s+32|\.arm/;
 
+    if ($as_type eq "armasm") {
+        $line =~ s/\.thumb/THUMB/x;
+        $line =~ s/\.arm/ARM/x;
+    }
+
     # handle ldr <reg>, =<expr>
-    if ($line =~ /(.*)\s*ldr([\w\s\d]+)\s*,\s*=(.*)/) {
+    if ($line =~ /(.*)\s*ldr([\w\s\d]+)\s*,\s*=(.*)/ and $as_type ne "armasm") {
         my $label = $literal_labels{$3};
         if (!$label) {
             $label = "Literal_$literal_num";
@@ -500,7 +585,7 @@ foreach my $line (@pass1_lines) {
             $literal_labels{$3} = $label;
         }
         $line = "$1 ldr$2, $label\n";
-    } elsif ($line =~ /\.ltorg/) {
+    } elsif ($line =~ /\.ltorg/ and $as_type ne "armasm") {
         $line .= ".align 2\n";
         foreach my $literal (keys %literal_labels) {
             $line .= "$literal_labels{$literal}:\n $literal_expr $literal\n";
@@ -524,7 +609,7 @@ foreach my $line (@pass1_lines) {
     $line =~ s/(?<!\w)\.(L\w+)/$1/g;
 
     # recycle the commented '.func' directive for '.thumb_func'
-    if ($thumb) {
+    if ($thumb and $as_type =~ /^apple-/) {
         $line =~ s/$comm\.func/.thumb_func/x;
     }
 
@@ -533,7 +618,7 @@ foreach my $line (@pass1_lines) {
     }
 
     if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.globl)\s+(\w+)/ and
-	$as_type ne "gas") {
+	$as_type =~ /^-apple/) {
         my $cond = $3;
         my $label = $4;
         # Don't interpret e.g. bic as b<cc> with ic as conditional code
@@ -627,7 +712,8 @@ sub handle_serialized_line {
         return if handle_if($line);
     }
 
-    handle_set($line);
+    # Strip out the .set lines from the armasm output
+    return if (handle_set($line) and $as_type eq "armasm");
 
     if ($line =~ /\.unreq\s+(.*)/) {
         if (defined $neon_alias_reg{$1}) {
@@ -668,7 +754,7 @@ sub handle_serialized_line {
         }
     }
 
-    if ($arch eq "aarch64") {
+    if ($arch eq "aarch64" or $as_type eq "armasm") {
         # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
         if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
             $aarch64_req_alias{$1} = $2;
@@ -683,6 +769,8 @@ sub handle_serialized_line {
             }
             $line =~ s/\b$alias\b/$resolved/g;
         }
+    }
+    if ($arch eq "aarch64") {
         # fix missing aarch64 instructions in Xcode 5.1 (beta3)
         # mov with vector arguments is not supported, use alias orr instead
         if ($line =~ /^\s*mov\s+(v\d[\.{}\[\]\w]+),\s*(v\d[\.{}\[\]\w]+)\b\s*$/) {
@@ -708,17 +796,149 @@ sub handle_serialized_line {
         }
     }
 
+    if ($as_type eq "armasm") {
+        # Also replace variables set by .set
+        foreach (keys %symbols) {
+            my $sym = $_;
+            $line =~ s/\b$sym\b/$symbols{$sym}/g;
+        }
+
+        # Handle function declarations and keep track of the declared labels
+        if ($line =~ s/^\s*\.func\s+(\w+)/$1 PROC/) {
+            $labels_seen{$1} = 1;
+        }
+
+        if ($line =~ s/^(\d+)://) {
+            # Convert local labels into unique labels. armasm (at least in
+            # RVCT) has something similar, but still different enough.
+            # By converting to unique labels we avoid any possible
+            # incompatibilities.
+
+            my $num = $1;
+            foreach (@{$next_temp_labels{$num}}) {
+                $line = "$_\n" . $line;
+            }
+            @next_temp_labels{$num} = ();
+            my $name = "temp_label_$temp_label_next";
+            $temp_label_next++;
+            # The matching regexp above removes the label from the start of
+            # the line (which might contain an instruction as well), readd
+            # it on a separate line above it.
+            $line = "$name:\n" . $line;
+            $last_temp_labels{$num} = $name;
+        }
+
+        if ($line =~ s/^(\w+):/$1/) {
+            # Skip labels that have already been declared with a PROC,
+            # labels must not be declared multiple times.
+            return if (defined $labels_seen{$1});
+            $labels_seen{$1} = 1;
+        } elsif ($line !~ /(\w+) PROC/) {
+            # If not a label, make sure the line starts with whitespace,
+            # otherwise ms armasm interprets it incorrectly.
+            $line =~ s/^[\.\w]/\t$&/;
+        }
+
+
+        # Check branch instructions
+        if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?)\s+(\w+)/) {
+            my $cond = $3;
+            my $target = $4;
+            # Don't interpret e.g. bic as b<cc> with ic as conditional code
+            if ($cond !~ /|eq|ne|cs|cc|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|hs|lo/) {
+                # Not actually a branch
+            } elsif ($target =~ /(\d+)([bf])/) {
+                # The target is a local label
+                my $num = $1;
+                my $dir = $2;
+                if ($dir eq "b") {
+                    $line =~ s/$target/$last_temp_labels{$num}/;
+                } else {
+                    my $name = "temp_label_$temp_label_next";
+                    $temp_label_next++;
+                    push(@{$next_temp_labels{$num}}, $name);
+                    $line =~ s/$target/$name/;
+                }
+            } elsif ($target ne "lr" and
+                     $target ne "ip" and
+                     $target !~ /^[rav]\d+$/) {
+                $call_targets{$target}++;
+            }
+        }
+
+        # ALIGN in armasm syntax is the actual number of bytes
+        if ($line =~ /\.align\s+(\d+)/) {
+            my $align = 1 << $1;
+            $line =~ s/\.align\s(\d+)/ALIGN $align/;
+        }
+        # Convert gas style [r0, :128] into armasm [r0@128] alignment specification
+        $line =~ s/\[([^\[]+),\s*:(\d+)\]/[$1\@$2]/g;
+
+        # armasm treats logical values {TRUE} and {FALSE} separately from
+        # numeric values - logical operators and values can't be intermixed
+        # with numerical values. Evaluate !<number> and (a <> b) into numbers,
+        # let the assembler evaluate the rest of the expressions. This current
+        # only works for cases when ! and <> are used with actual constant numbers,
+        # we don't evaluate subexpressions here.
+
+        # Evaluate !<number>
+        while ($line =~ /!\s*(\d+)/g) {
+            my $val = ($1 != 0) ? 0 : 1;
+            $line =~ s/!(\d+)/$val/;
+        }
+        # Evaluate (a > b)
+        while ($line =~ /\(\s*(\d+)\s*([<>])\s*(\d+)\s*\)/) {
+            my $val;
+            if ($2 eq "<") {
+                $val = ($1 < $3) ? 1 : 0;
+            } else {
+                $val = ($1 > $3) ? 1 : 0;
+            }
+            $line =~ s/\(\s*(\d+)\s*([<>])\s*(\d+)\s*\)/$val/;
+        }
+
+        # Change a movw... #:lower16: into a mov32 pseudoinstruction
+        $line =~ s/^(\s*)movw(\s+\w+\s*,\s*)\#:lower16:(.*)$/$1mov32$2$3/;
+        # and remove the following, matching movt completely
+        $line =~ s/^\s*movt\s+\w+\s*,\s*\#:upper16:.*$//;
+
+        if ($line =~ /^\s*mov32\s+\w+,\s*([a-zA-Z]\w*)/) {
+            $mov32_targets{$1}++;
+        }
+
+        # Misc bugs/deficiencies:
+        # armasm seems unable to parse e.g. "vmov s0, s1" without a type
+        # qualifier, thus add .f32.
+        $line =~ s/^(\s+(?:vmov|vadd))(\s+s)/$1.f32$2/;
+        # armasm is unable to parse &0x - add spacing
+        $line =~ s/&0x/& 0x/g;
+    }
+
     print ASMFILE $line;
 }
 
-print ASMFILE ".text\n";
-print ASMFILE ".align 2\n";
-foreach my $literal (keys %literal_labels) {
-    print ASMFILE "$literal_labels{$literal}:\n $literal_expr $literal\n";
+if ($as_type ne "armasm") {
+    print ASMFILE ".text\n";
+    print ASMFILE ".align 2\n";
+    foreach my $literal (keys %literal_labels) {
+        print ASMFILE "$literal_labels{$literal}:\n $literal_expr $literal\n";
+    }
+
+    map print(ASMFILE ".thumb_func $_\n"),
+        grep exists $thumb_labels{$_}, keys %call_targets;
+} else {
+    map print(ASMFILE "\tIMPORT $_\n"),
+        grep ! exists $labels_seen{$_}, (keys %call_targets, keys %mov32_targets);
+
+    print ASMFILE "\tEND\n";
 }
 
-map print(ASMFILE ".thumb_func $_\n"),
-    grep exists $thumb_labels{$_}, keys %call_targets;
-
 close(ASMFILE) or exit 1;
+if ($as_type eq "armasm" and ! defined $ENV{GASPP_DEBUG}) {
+    system(@gcc_cmd) == 0 or die "Error running assembler";
+}
+
+END {
+    unlink($tempfile) if defined $tempfile;
+}
 #exit 1
