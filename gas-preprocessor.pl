@@ -408,6 +408,9 @@ my %call_targets;
 my @irp_args;
 my $irp_param;
 
+my %neon_alias_reg;
+my %neon_alias_type;
+
 # pass 2: parse .rept and .if variants
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
@@ -474,12 +477,39 @@ foreach my $line (@pass1_lines) {
         }
     }
 
+    if ($line =~ /\.unreq\s+(.*)/) {
+        if (defined $neon_alias_reg{$1}) {
+            delete $neon_alias_reg{$1};
+            delete $neon_alias_type{$1};
+            next;
+        }
+    }
     # old gas versions store upper and lower case names on .req,
     # but they remove only one on .unreq
     if ($fix_unreq) {
         if ($line =~ /\.unreq\s+(.*)/) {
             $line = ".unreq " . lc($1) . "\n";
             $line .= ".unreq " . uc($1) . "\n";
+        }
+    }
+
+    if ($line =~ /(\w+)\s+\.(dn|qn)\s+(\w+)(?:\.(\w+))?(\[\d+\])?/) {
+        $neon_alias_reg{$1} = "$3$5";
+        $neon_alias_type{$1} = $4;
+        next;
+    }
+    if (scalar keys %neon_alias_reg > 0 && $line =~ /^\s+v\w+/) {
+        # This line seems to possibly have a neon instruction
+        foreach (keys %neon_alias_reg) {
+            my $alias = $_;
+            # Require the register alias to match as an invididual word, not as a substring
+            # of a larger word-token.
+            if ($line =~ /\b$alias\b/) {
+                $line =~ s/\b$alias\b/$neon_alias_reg{$alias}/g;
+                # Add the type suffix. If multiple aliases match on the same line,
+                # only do this replacement the first time (a vfoo.bar string won't match v\w+).
+                $line =~ s/^(\s+)(v\w+)(\s+)/$1$2.$neon_alias_type{$alias}$3/;
+            }
         }
     }
 
