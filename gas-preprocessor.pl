@@ -167,7 +167,7 @@ sub handle_if {
         } elsif ($type eq "lt") {
             $result = eval_expr($expr) < 0;
         } else {
-	    chomp($line);
+            chomp($line);
             die "unhandled .if varient. \"$line\"";
         }
         push (@ifstack, $result);
