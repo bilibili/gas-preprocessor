@@ -49,10 +49,12 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
 @preprocess_c_cmd = map { /\.o$/ ? "-" : $_ } @preprocess_c_cmd;
 
 my $comm;
+my $aarch64 = 0;
 
 # detect architecture from gcc binary name
 if      ($gcc_cmd[0] =~ /arm64|aarch64/) {
     $comm = '//';
+    $aarch64 = 1;
 } elsif ($gcc_cmd[0] =~ /arm/) {
     $comm = '@';
 } elsif ($gcc_cmd[0] =~ /powerpc|ppc/) {
@@ -64,6 +66,7 @@ foreach my $i (1 .. $#gcc_cmd-1) {
     if ($gcc_cmd[$i] eq "-arch") {
         if      ($gcc_cmd[$i+1] =~ /arm64|aarch64/) {
             $comm = '//';
+            $aarch64 = 1;
         } elsif ($gcc_cmd[$i+1] =~ /arm/) {
             $comm = '@';
         } elsif ($gcc_cmd[$i+1] =~ /powerpc|ppc/) {
@@ -77,6 +80,7 @@ if (!$comm) {
     my $native_arch = qx/arch/;
     if      ($native_arch =~ /arm64|aarch64/) {
         $comm = '//';
+        $aarch64 = 1;
     } elsif ($native_arch =~ /arm/) {
         $comm = '@';
     } elsif ($native_arch =~ /powerpc|ppc/) {
@@ -417,6 +421,8 @@ my $irp_param;
 my %neon_alias_reg;
 my %neon_alias_type;
 
+my %aarch64_req_alias;
+
 # pass 2: parse .rept and .if variants
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
@@ -495,6 +501,9 @@ foreach my $line (@pass1_lines) {
             delete $neon_alias_reg{$1};
             delete $neon_alias_type{$1};
             next;
+        } elsif (defined $aarch64_req_alias{$1}) {
+            delete $aarch64_req_alias{$1};
+            next;
         }
     }
     # old gas versions store upper and lower case names on .req,
@@ -523,6 +532,23 @@ foreach my $line (@pass1_lines) {
                 # only do this replacement the first time (a vfoo.bar string won't match v\w+).
                 $line =~ s/^(\s+)(v\w+)(\s+)/$1$2.$neon_alias_type{$alias}$3/;
             }
+        }
+    }
+
+    if ($aarch64) {
+        # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
+        if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
+            $aarch64_req_alias{$1} = $2;
+            next;
+        }
+        foreach (keys %aarch64_req_alias) {
+            my $alias = $_;
+            # recursively resolve aliases
+            my $resolved = $aarch64_req_alias{$alias};
+            while (defined $aarch64_req_alias{$resolved}) {
+                $resolved = $aarch64_req_alias{$resolved};
+            }
+            $line =~ s/\b$alias\b/$resolved/g;
         }
     }
 
