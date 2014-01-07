@@ -590,19 +590,14 @@ foreach my $line (@pass1_lines) {
                     my $line = $origline;
                     $line =~ s/\\$irp_param/$i/g;
                     $line =~ s/\\\(\)//g;     # remove \()
-                    if (!parse_if_line($line) && !handle_if($line)) {
-                        handle_set($line);
-                        print ASMFILE $line;
-                    }
+                    handle_serialized_line($line, 1);
                 }
             }
         } else {
             for (1 .. $num_repts) {
-                foreach my $line (@rept_lines) {
-                    if (!parse_if_line($line) && !handle_if($line)) {
-                        handle_set($line);
-                        print ASMFILE $line;
-                    }
+                foreach my $origline (@rept_lines) {
+                    my $line = $origline;
+                    handle_serialized_line($line, 1);
                 }
             }
         }
@@ -612,9 +607,21 @@ foreach my $line (@pass1_lines) {
     } elsif (scalar(@rept_lines)) {
         push(@rept_lines, $line);
     } else {
-        handle_set($line);
-        print ASMFILE $line;
+        handle_serialized_line($line, 0);
     }
+}
+
+sub handle_serialized_line {
+    my $line = @_[0];
+    my $do_eval_if = @_[1];
+
+    if ($do_eval_if) {
+        return if parse_if_line($line);
+        return if handle_if($line);
+    }
+
+    handle_set($line);
+    print ASMFILE $line;
 }
 
 print ASMFILE ".text\n";
