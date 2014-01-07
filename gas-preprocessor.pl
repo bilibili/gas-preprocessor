@@ -496,62 +496,6 @@ foreach my $line (@pass1_lines) {
         }
     }
 
-    if ($line =~ /\.unreq\s+(.*)/) {
-        if (defined $neon_alias_reg{$1}) {
-            delete $neon_alias_reg{$1};
-            delete $neon_alias_type{$1};
-            next;
-        } elsif (defined $aarch64_req_alias{$1}) {
-            delete $aarch64_req_alias{$1};
-            next;
-        }
-    }
-    # old gas versions store upper and lower case names on .req,
-    # but they remove only one on .unreq
-    if ($fix_unreq) {
-        if ($line =~ /\.unreq\s+(.*)/) {
-            $line = ".unreq " . lc($1) . "\n";
-            $line .= ".unreq " . uc($1) . "\n";
-        }
-    }
-
-    if ($line =~ /(\w+)\s+\.(dn|qn)\s+(\w+)(?:\.(\w+))?(\[\d+\])?/) {
-        $neon_alias_reg{$1} = "$3$5";
-        $neon_alias_type{$1} = $4;
-        next;
-    }
-    if (scalar keys %neon_alias_reg > 0 && $line =~ /^\s+v\w+/) {
-        # This line seems to possibly have a neon instruction
-        foreach (keys %neon_alias_reg) {
-            my $alias = $_;
-            # Require the register alias to match as an invididual word, not as a substring
-            # of a larger word-token.
-            if ($line =~ /\b$alias\b/) {
-                $line =~ s/\b$alias\b/$neon_alias_reg{$alias}/g;
-                # Add the type suffix. If multiple aliases match on the same line,
-                # only do this replacement the first time (a vfoo.bar string won't match v\w+).
-                $line =~ s/^(\s+)(v\w+)(\s+)/$1$2.$neon_alias_type{$alias}$3/;
-            }
-        }
-    }
-
-    if ($aarch64) {
-        # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
-        if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
-            $aarch64_req_alias{$1} = $2;
-            next;
-        }
-        foreach (keys %aarch64_req_alias) {
-            my $alias = $_;
-            # recursively resolve aliases
-            my $resolved = $aarch64_req_alias{$alias};
-            while (defined $aarch64_req_alias{$resolved}) {
-                $resolved = $aarch64_req_alias{$resolved};
-            }
-            $line =~ s/\b$alias\b/$resolved/g;
-        }
-    }
-
     if ($line =~ /\.rept\s+(.*)/) {
         $num_repts = $1;
         @rept_lines = ("\n");
@@ -621,6 +565,63 @@ sub handle_serialized_line {
     }
 
     handle_set($line);
+
+    if ($line =~ /\.unreq\s+(.*)/) {
+        if (defined $neon_alias_reg{$1}) {
+            delete $neon_alias_reg{$1};
+            delete $neon_alias_type{$1};
+            return;
+        } elsif (defined $aarch64_req_alias{$1}) {
+            delete $aarch64_req_alias{$1};
+            return;
+        }
+    }
+    # old gas versions store upper and lower case names on .req,
+    # but they remove only one on .unreq
+    if ($fix_unreq) {
+        if ($line =~ /\.unreq\s+(.*)/) {
+            $line = ".unreq " . lc($1) . "\n";
+            $line .= ".unreq " . uc($1) . "\n";
+        }
+    }
+
+    if ($line =~ /(\w+)\s+\.(dn|qn)\s+(\w+)(?:\.(\w+))?(\[\d+\])?/) {
+        $neon_alias_reg{$1} = "$3$5";
+        $neon_alias_type{$1} = $4;
+        return;
+    }
+    if (scalar keys %neon_alias_reg > 0 && $line =~ /^\s+v\w+/) {
+        # This line seems to possibly have a neon instruction
+        foreach (keys %neon_alias_reg) {
+            my $alias = $_;
+            # Require the register alias to match as an invididual word, not as a substring
+            # of a larger word-token.
+            if ($line =~ /\b$alias\b/) {
+                $line =~ s/\b$alias\b/$neon_alias_reg{$alias}/g;
+                # Add the type suffix. If multiple aliases match on the same line,
+                # only do this replacement the first time (a vfoo.bar string won't match v\w+).
+                $line =~ s/^(\s+)(v\w+)(\s+)/$1$2.$neon_alias_type{$alias}$3/;
+            }
+        }
+    }
+
+    if ($aarch64) {
+        # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
+        if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
+            $aarch64_req_alias{$1} = $2;
+            return;
+        }
+        foreach (keys %aarch64_req_alias) {
+            my $alias = $_;
+            # recursively resolve aliases
+            my $resolved = $aarch64_req_alias{$alias};
+            while (defined $aarch64_req_alias{$resolved}) {
+                $resolved = $aarch64_req_alias{$resolved};
+            }
+            $line =~ s/\b$alias\b/$resolved/g;
+        }
+    }
+
     print ASMFILE $line;
 }
 
