@@ -625,6 +625,10 @@ sub handle_serialized_line {
         if ($line =~ /^\s*mov\s+(v\d[\.{}\[\]\w]+),\s*(v\d[\.{}\[\]\w]+)\b\s*$/) {
             $line = "        orr $1, $2, $2\n";
         }
+        # movi 8, 16, 32 bit shifted variant, shift is optional
+        if ($line =~ /^\s*movi\s+(v[0-3]?\d\.(?:2|4|8|16)[bhsBHS])\s*,\s*(#\w+)\b\s*$/) {
+            $line = "        movi $1, $2, lsl #0\n";
+        }
     }
 
     print ASMFILE $line;
