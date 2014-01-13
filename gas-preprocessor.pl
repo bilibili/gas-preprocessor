@@ -620,6 +620,11 @@ sub handle_serialized_line {
             }
             $line =~ s/\b$alias\b/$resolved/g;
         }
+        # fix missing aarch64 instructions in Xcode 5.1 (beta3)
+        # mov with vector arguments is not supported, use alias orr instead
+        if ($line =~ /^\s*mov\s+(v\d[\.{}\[\]\w]+),\s*(v\d[\.{}\[\]\w]+)\b\s*$/) {
+            $line = "        orr $1, $2, $2\n";
+        }
     }
 
     print ASMFILE $line;
