@@ -633,6 +633,16 @@ sub handle_serialized_line {
         if ($line =~ /^\s*uxtl(2)?\s+(v[0-3]?\d\.[248][hsdHSD])\s*,\s*(v[0-3]?\d\.(?:4|8|16)[bhsBHS])\b\s*$/) {
             $line = "        ushll$1 $2, $3, #0\n";
         }
+        if ($ENV{GASPP_FIX_XCODE5}) {
+            if ($line =~ /^\s*bsl\b/) {
+                $line =~ s/\b(bsl)(\s+v[0-3]?\d\.(\w+))\b/$1.$3$2/;
+                $line =~ s/\b(v[0-3]?\d)\.$3\b/$1/g;
+            }
+            if ($line =~ /^\s*saddl2?\b/) {
+                $line =~ s/\b(saddl2?)(\s+v[0-3]?\d\.(\w+))\b/$1.$3$2/;
+                $line =~ s/\b(v[0-3]?\d)\.\w+\b/$1/g;
+            }
+        }
     }
 
     print ASMFILE $line;
