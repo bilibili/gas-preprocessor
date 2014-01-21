@@ -471,6 +471,11 @@ foreach my $line (@pass1_lines) {
     # mach-o local symbol names start with L (no dot)
     $line =~ s/(?<!\w)\.(L\w+)/$1/g;
 
+    # recycle the commented '.func' directive for '.thumb_func'
+    if ($thumb) {
+        $line =~ s/$comm\.func/.thumb_func/x;
+    }
+
     if ($thumb and $line =~ /^\s*(\w+)\s*:/) {
         $thumb_labels{$1}++;
     }
