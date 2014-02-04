@@ -480,11 +480,16 @@ foreach my $line (@pass1_lines) {
         $thumb_labels{$1}++;
     }
 
-    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(?:..)?(?:\.w)?|\.globl)\s+(\w+)/) {
-        if (exists $thumb_labels{$3}) {
-            print ASMFILE ".thumb_func $3\n";
-        } else {
-            $call_targets{$3}++;
+    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.globl)\s+(\w+)/) {
+        my $cond = $3;
+        my $label = $4;
+        # Don't interpret e.g. bic as b<cc> with ic as conditional code
+        if ($cond =~ /|eq|ne|cs|cc|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|hs|lo/) {
+            if (exists $thumb_labels{$label}) {
+                print ASMFILE ".thumb_func $label\n";
+            } else {
+                $call_targets{$label}++;
+            }
         }
     }
 
