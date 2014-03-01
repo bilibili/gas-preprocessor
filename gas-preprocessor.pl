@@ -27,6 +27,7 @@ my $arch;
 my $as_type = "apple-gas";
 
 my $fix_unreq = $^O eq "darwin";
+my $force_thumb = 0;
 
 my $usage_str = "
 $0\n
@@ -43,6 +44,9 @@ command. Following options are currently supported:
     -as-type      - one value out of {{,apple-}{gas,clang},armasm}
     -fix-unreq
     -no-fix-unreq
+    -force-thumb  - assemble as thumb regardless of the input source
+                    (note, this is incomplete and only works for sources
+                    it explicitly was tested with)
 ";
 
 sub usage() {
@@ -74,6 +78,8 @@ while (@options) {
     my $opt = shift @options;
     if ($opt =~ /^-(no-)?fix-unreq$/) {
         $fix_unreq = $1 ne "no-";
+    } elsif ($opt eq "-force-thumb") {
+        $force_thumb = 1;
     } elsif ($opt eq "-arch") {
         $arch = shift @options;
         die "unknown arch: '$arch'\n" if not exists $comments{$arch};
@@ -212,6 +218,10 @@ my @pass1_lines;
 my @ifstack;
 
 my %symbols;
+
+if ($force_thumb) {
+    parse_line(".thumb\n");
+}
 
 # pass 1: parse .macro
 # note that the handling of arguments is probably overly permissive vs. gas
@@ -881,6 +891,24 @@ sub handle_serialized_line {
         $line =~ s/^(\s+(?:vmov|vadd))(\s+s)/$1.f32$2/;
         # armasm is unable to parse &0x - add spacing
         $line =~ s/&0x/& 0x/g;
+    }
+
+    if ($force_thumb) {
+        # Convert register post indexing to a separate add instruction.
+        # This converts e.g. "ldr r0, [r1], r2" into "ldr r0, [r1]",
+        # "add r1, r1, r2".
+        $line =~ s/(ldr|str)\s+(\w+),\s*\[(\w+)\],\s*(\w+)/$1 $2, [$3]\n\tadd $3, $3, $4/g;
+
+        # Convert "mov pc, lr" into "bx lr", since the former only works
+        # for switching from arm to thumb (and only in armv7), but not
+        # from thumb to arm.
+        s/mov\s*pc\s*,\s*lr/bx lr/g;
+
+        # Convert stmdb/ldmia with only one register into a plain str/ldr with post-increment/decrement
+        $line =~ s/stmdb\s+sp!\s*,\s*\{([^,-]+)\}/str $1, [sp, #-4]!/g;
+        $line =~ s/ldmia\s+sp!\s*,\s*\{([^,-]+)\}/ldr $1, [sp], #4/g;
+
+        $line =~ s/\.arm/.thumb/x;
     }
 
     # comment out unsupported directives
