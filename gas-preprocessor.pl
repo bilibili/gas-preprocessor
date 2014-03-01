@@ -143,6 +143,20 @@ if ($as_type ne "armasm") {
     @preprocess_c_cmd = grep ! /^-c$/, @preprocess_c_cmd;
     @preprocess_c_cmd = grep ! /^-m/, @preprocess_c_cmd;
 
+    @preprocess_c_cmd = grep ! /^-G/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-W/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-Z/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-fp/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-EHsc$/, @preprocess_c_cmd;
+    @preprocess_c_cmd = grep ! /^-O/, @preprocess_c_cmd;
+
+    @gcc_cmd = grep ! /^-G/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-W/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-Z/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-fp/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-EHsc$/, @gcc_cmd;
+    @gcc_cmd = grep ! /^-O/, @gcc_cmd;
+
     my @outfiles = grep /\.o$/, @gcc_cmd;
     $tempfile = $outfiles[0].".asm";
 
