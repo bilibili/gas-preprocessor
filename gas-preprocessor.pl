@@ -24,6 +24,7 @@ my @preprocess_c_cmd;
 
 my $comm;
 my $arch;
+my $as_type = "apple-gas";
 
 my $fix_unreq = $^O eq "darwin";
 
@@ -39,6 +40,7 @@ command. Following options are currently supported:
 
     -help         - this usage text
     -arch         - target architecture
+    -as-type      - one value out of {,apple-}{gas,clang}
     -fix-unreq
     -no-fix-unreq
 ";
@@ -75,6 +77,9 @@ while (@options) {
     } elsif ($opt eq "-arch") {
         $arch = shift @options;
         die "unkown arch: '$arch'\n" if not exists $comments{$arch};
+    } elsif ($opt eq "-as-type") {
+        $as_type = shift @options;
+        die "unkown as type: '$as_type'\n" if $as_type !~ /^(apple-)?(gas|clang)$/;
     } elsif ($opt eq "-help") {
         usage();
         exit 0;
