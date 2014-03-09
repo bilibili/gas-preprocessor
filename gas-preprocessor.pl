@@ -454,6 +454,8 @@ my @rept_lines;
 
 my %literal_labels;     # for ldr <reg>, =<expr>
 my $literal_num = 0;
+my $literal_expr = ".word";
+$literal_expr = ".quad" if $arch eq "aarch64";
 
 my $thumb = 0;
 
@@ -496,7 +498,7 @@ foreach my $line (@pass1_lines) {
     } elsif ($line =~ /\.ltorg/) {
         $line .= ".align 2\n";
         foreach my $literal (keys %literal_labels) {
-            $line .= "$literal_labels{$literal}:\n .word $literal\n";
+            $line .= "$literal_labels{$literal}:\n $literal_expr $literal\n";
         }
         %literal_labels = ();
     }
@@ -706,7 +708,7 @@ sub handle_serialized_line {
 print ASMFILE ".text\n";
 print ASMFILE ".align 2\n";
 foreach my $literal (keys %literal_labels) {
-    print ASMFILE "$literal_labels{$literal}:\n .word $literal\n";
+    print ASMFILE "$literal_labels{$literal}:\n $literal_expr $literal\n";
 }
 
 map print(ASMFILE ".thumb_func $_\n"),
