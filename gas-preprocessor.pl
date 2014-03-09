@@ -169,24 +169,24 @@ while (<ASMFILE>) {
     s/(?<!\\)$comm.*//x;
 
     # comment out unsupported directives
-    s/\.type/$comm$&/x;
-    s/\.func/$comm$&/x;
-    s/\.endfunc/$comm$&/x;
-    s/\.ltorg/$comm$&/x;
-    s/\.size/$comm$&/x;
-    s/\.fpu/$comm$&/x;
-    s/\.arch/$comm$&/x;
-    s/\.object_arch/$comm$&/x;
+    s/\.type/$comm$&/x        if $as_type =~ /^apple-/;
+    s/\.func/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
+    s/\.endfunc/$comm$&/x     if $as_type =~ /^(apple-|clang)/;
+    s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang)/;
+    s/\.size/$comm$&/x        if $as_type =~ /^apple-/;
+    s/\.fpu/$comm$&/x         if $as_type =~ /^apple-/;
+    s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
+    s/\.object_arch/$comm$&/x if $as_type =~ /^apple-/;
 
     # the syntax for these is a little different
-    s/\.global/.globl/x;
+    s/\.global/.globl/x       if $as_type =~ /apple-/;
     # also catch .section .rodata since the equivalent to .const_data is .section __DATA,__const
-    s/(.*)\.rodata/.const_data/x;
+    s/(.*)\.rodata/.const_data/x if $as_type =~ /apple-/;
     s/\.int/.long/x;
     s/\.float/.single/x;
 
     # catch unknown section names that aren't mach-o style (with a comma)
-    if (/.section ([^,]*)$/) {
+    if ($as_type =~ /apple-/ and /.section ([^,]*)$/) {
         die ".section $1 unsupported; figure out the mach-o section name and add it";
     }
 
@@ -532,7 +532,8 @@ foreach my $line (@pass1_lines) {
         $thumb_labels{$1}++;
     }
 
-    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.globl)\s+(\w+)/) {
+    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.globl)\s+(\w+)/ and
+	$as_type ne "gas") {
         my $cond = $3;
         my $label = $4;
         # Don't interpret e.g. bic as b<cc> with ic as conditional code
