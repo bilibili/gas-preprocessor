@@ -10,17 +10,78 @@ use strict;
 # implements the subset of the gas preprocessor used by x264 and ffmpeg
 # that isn't supported by Apple's gas.
 
-my @gcc_cmd = @ARGV;
+my %canonical_arch = ("aarch64" => "aarch64", "arm64" => "aarch64",
+                      "arm"     => "arm",
+                      "powerpc" => "powerpc", "ppc"   => "powerpc");
+
+my %comments = ("aarch64" => '//',
+                "arm"     => '@',
+                "powerpc" => '#');
+
+my @options;
+my @gcc_cmd;
 my @preprocess_c_cmd;
+
+my $comm;
+my $arch;
 
 my $fix_unreq = $^O eq "darwin";
 
-if ($gcc_cmd[0] eq "-fix-unreq") {
-    $fix_unreq = 1;
-    shift @gcc_cmd;
-} elsif ($gcc_cmd[0] eq "-no-fix-unreq") {
-    $fix_unreq = 0;
-    shift @gcc_cmd;
+my $usage_str = "
+$0\n
+Gas-preprocessor.pl converts assembler files using modern GNU as syntax for
+Apple's ancient gas version or clang's incompatible integrated assembler. The
+conversion is regularly tested for Libav, x264 and vlc. Other projects might
+use different features which are not correctly handled.
+
+Options for this program needs to be separated with ' -- ' from the assembler
+command. Following options are currently supported:
+
+    -help         - this usage text
+    -arch         - target architecture
+    -fix-unreq
+    -no-fix-unreq
+";
+
+sub usage() {
+    print $usage_str;
+}
+
+while (@ARGV) {
+    my $opt = shift;
+    last if ($opt =~ /^--$/);
+    push @options, $opt;
+}
+if (@ARGV) {
+    @gcc_cmd = @ARGV;
+} else {
+    @gcc_cmd = @options;
+    @options = ();
+
+    # backward compatible handling
+    if ($gcc_cmd[0] eq "-fix-unreq") {
+        $fix_unreq = 1;
+        shift @gcc_cmd;
+    } elsif ($gcc_cmd[0] eq "-no-fix-unreq") {
+        $fix_unreq = 0;
+        shift @gcc_cmd;
+    }
+}
+
+while (@options) {
+    my $opt = shift @options;
+    if ($opt =~ /^-(no-)?fix-unreq$/) {
+        $fix_unreq = $1 ne "no-";
+    } elsif ($opt eq "-arch") {
+        $arch = shift @options;
+        die "unkown arch: '$arch'\n" if not exists $comments{$arch};
+    } elsif ($opt eq "-help") {
+        usage();
+        exit 0;
+    } else {
+        usage();
+        die "option '$opt' is not known\n";
+    }
 }
 
 if (grep /\.c$/, @gcc_cmd) {
@@ -53,49 +114,28 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
 @gcc_cmd = map { /\.[csS]$/ ? qw(-x assembler -) : $_ } @gcc_cmd;
 @preprocess_c_cmd = map { /\.o$/ ? "-" : $_ } @preprocess_c_cmd;
 
-my $comm;
-my $aarch64 = 0;
-
 # detect architecture from gcc binary name
-if      ($gcc_cmd[0] =~ /arm64|aarch64/) {
-    $comm = '//';
-    $aarch64 = 1;
-} elsif ($gcc_cmd[0] =~ /arm/) {
-    $comm = '@';
-} elsif ($gcc_cmd[0] =~ /powerpc|ppc/) {
-    $comm = '#';
-}
-
-# look for -arch flag
-foreach my $i (1 .. $#gcc_cmd-1) {
-    if ($gcc_cmd[$i] eq "-arch") {
-        if      ($gcc_cmd[$i+1] =~ /arm64|aarch64/) {
-            $comm = '//';
-            $aarch64 = 1;
-        } elsif ($gcc_cmd[$i+1] =~ /arm/) {
-            $comm = '@';
-        } elsif ($gcc_cmd[$i+1] =~ /powerpc|ppc/) {
-            $comm = '#';
+if (!$arch) {
+    if ($gcc_cmd[0] =~ /(arm64|aarch64|arm|powerpc|ppc)/) {
+        $arch = $1;
+    } else {
+        # look for -arch flag
+        foreach my $i (1 .. $#gcc_cmd-1) {
+            if ($gcc_cmd[$i] eq "-arch" and
+                $gcc_cmd[$i+1] =~ /(arm64|aarch64|arm|powerpc|ppc)/) {
+                $arch = $1;
+            }
         }
     }
 }
 
 # assume we're not cross-compiling if no -arch or the binary doesn't have the arch name
-if (!$comm) {
-    my $native_arch = qx/arch/;
-    if      ($native_arch =~ /arm64|aarch64/) {
-        $comm = '//';
-        $aarch64 = 1;
-    } elsif ($native_arch =~ /arm/) {
-        $comm = '@';
-    } elsif ($native_arch =~ /powerpc|ppc/) {
-        $comm = '#';
-    }
-}
+$arch = qx/arch/ if (!$arch);
 
-if (!$comm) {
-    die "Unable to identify target architecture";
-}
+die "Unknown target architecture '$arch'" if not exists $canonical_arch{$arch};
+
+$arch = $canonical_arch{$arch};
+$comm = $comments{$arch};
 
 my %ppc_spr = (ctr    => 9,
                vrsave => 256);
@@ -620,7 +660,7 @@ sub handle_serialized_line {
         }
     }
 
-    if ($aarch64) {
+    if ($arch eq "aarch64") {
         # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
         if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
             $aarch64_req_alias{$1} = $2;
