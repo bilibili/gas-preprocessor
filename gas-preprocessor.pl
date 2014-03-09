@@ -661,9 +661,7 @@ sub handle_serialized_line {
 print ASMFILE ".text\n";
 print ASMFILE ".align 2\n";
 foreach my $literal (keys %literal_labels) {
-    my $label = $literal_labels{$literal};
-    print ASMFILE ".set Lval_$label, $literal\n";
-    print ASMFILE "$label: .word Lval_$label\n";
+    print ASMFILE "$literal_labels{$literal}:\n .word $literal\n";
 }
 
 map print(ASMFILE ".thumb_func $_\n"),
