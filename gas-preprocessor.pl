@@ -76,10 +76,10 @@ while (@options) {
         $fix_unreq = $1 ne "no-";
     } elsif ($opt eq "-arch") {
         $arch = shift @options;
-        die "unkown arch: '$arch'\n" if not exists $comments{$arch};
+        die "unknown arch: '$arch'\n" if not exists $comments{$arch};
     } elsif ($opt eq "-as-type") {
         $as_type = shift @options;
-        die "unkown as type: '$as_type'\n" if $as_type !~ /^(apple-)?(gas|clang)$/;
+        die "unknown as type: '$as_type'\n" if $as_type !~ /^(apple-)?(gas|clang)$/;
     } elsif ($opt eq "-help") {
         usage();
         exit 0;
