@@ -211,54 +211,14 @@ while (<ASMFILE>) {
     # syntax, but since the line numbers are off they are only misleading.
     s/^#\s+(\d+).*//          if $as_type =~ /armasm/;
 
-    # comment out unsupported directives
-    s/\.type/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
-    s/\.func/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
-    s/\.endfunc/$comm$&/x     if $as_type =~ /^(apple-|clang)/;
-    s/\.endfunc/ENDP/x        if $as_type =~ /armasm/;
-    s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang|armasm)/;
-    s/\.size/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
-    s/\.fpu/$comm$&/x         if $as_type =~ /^(apple-|armasm)/;
-    s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang|armasm)/;
-    s/\.object_arch/$comm$&/x if $as_type =~ /^(apple-|armasm)/;
-
-    s/\.syntax/$comm$&/x      if $as_type =~ /armasm/;
     # armasm uses a different comment character. We don't want to change
     # $comm originally since that matches what the input source uses.
     s/$comm/;/                if $as_type =~ /armasm/;
 
-    if ($as_type =~ /^apple-/) {
-        # the syntax for these is a little different
-        s/\.global/.globl/x;
-        # also catch .section .rodata since the equivalent to .const_data is .section __DATA,__const
-        s/(.*)\.rodata/.const_data/x;
-        s/\.int/.long/x;
-        s/\.float/.single/x;
-    }
-    if ($as_type eq "armasm") {
-        s/\.global/EXPORT/x;
-        s/\.int/dcd/x;
-        s/\.long/dcd/x;
-        s/\.float/dcfs/x;
-        s/\.word/dcd/x;
-        s/\.short/dcw/x;
-        s/\.byte/dcb/x;
-        # The alignment in AREA is the power of two, just as .align in gas
-        s/\.text/AREA |.text|, CODE, READONLY, ALIGN=2, CODEALIGN/;
-        s/(.*)\.rodata/AREA |.rodata|, DATA, READONLY, ALIGN=5/;
-
-        s/fmxr/vmsr/;
-        s/fmrx/vmrs/;
-        s/fadds/vadd/;
-    }
-
-    # catch unknown section names that aren't mach-o style (with a comma)
-    if ($as_type =~ /apple-/ and /.section ([^,]*)$/) {
-        die ".section $1 unsupported; figure out the mach-o section name and add it";
-    }
-
     parse_line($_);
 }
+
+$comm = ";" if $as_type =~ /armasm/;
 
 sub eval_expr {
     my $expr = $_[0];
@@ -571,11 +531,6 @@ foreach my $line (@pass1_lines) {
     $thumb = 1 if $line =~ /\.code\s+16|\.thumb/;
     $thumb = 0 if $line =~ /\.code\s+32|\.arm/;
 
-    if ($as_type eq "armasm") {
-        $line =~ s/\.thumb/THUMB/x;
-        $line =~ s/\.arm/ARM/x;
-    }
-
     # handle ldr <reg>, =<expr>
     if ($line =~ /(.*)\s*ldr([\w\s\d]+)\s*,\s*=(.*)/ and $as_type ne "armasm") {
         my $label = $literal_labels{$3};
@@ -610,14 +565,14 @@ foreach my $line (@pass1_lines) {
 
     # recycle the commented '.func' directive for '.thumb_func'
     if ($thumb and $as_type =~ /^apple-/) {
-        $line =~ s/$comm\.func/.thumb_func/x;
+        $line =~ s/\.func/.thumb_func/x;
     }
 
     if ($thumb and $line =~ /^\s*(\w+)\s*:/) {
         $thumb_labels{$1}++;
     }
 
-    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.globl)\s+(\w+)/ and
+    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.global)\s+(\w+)/ and
 	$as_type =~ /^-apple/) {
         my $cond = $3;
         my $label = $4;
@@ -912,6 +867,51 @@ sub handle_serialized_line {
         $line =~ s/^(\s+(?:vmov|vadd))(\s+s)/$1.f32$2/;
         # armasm is unable to parse &0x - add spacing
         $line =~ s/&0x/& 0x/g;
+    }
+
+    # comment out unsupported directives
+    $line =~ s/\.type/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
+    $line =~ s/\.func/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
+    $line =~ s/\.endfunc/$comm$&/x     if $as_type =~ /^(apple-|clang)/;
+    $line =~ s/\.endfunc/ENDP/x        if $as_type =~ /armasm/;
+    $line =~ s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang|armasm)/;
+    $line =~ s/\.size/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
+    $line =~ s/\.fpu/$comm$&/x         if $as_type =~ /^(apple-|armasm)/;
+    $line =~ s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang|armasm)/;
+    $line =~ s/\.object_arch/$comm$&/x if $as_type =~ /^(apple-|armasm)/;
+
+    $line =~ s/\.syntax/$comm$&/x      if $as_type =~ /armasm/;
+
+    if ($as_type =~ /^apple-/) {
+        # the syntax for these is a little different
+        $line =~ s/\.global/.globl/x;
+        # also catch .section .rodata since the equivalent to .const_data is .section __DATA,__const
+        $line =~ s/(.*)\.rodata/.const_data/x;
+        $line =~ s/\.int/.long/x;
+        $line =~ s/\.float/.single/x;
+    }
+    if ($as_type eq "armasm") {
+        $line =~ s/\.global/EXPORT/x;
+        $line =~ s/\.int/dcd/x;
+        $line =~ s/\.long/dcd/x;
+        $line =~ s/\.float/dcfs/x;
+        $line =~ s/\.word/dcd/x;
+        $line =~ s/\.short/dcw/x;
+        $line =~ s/\.byte/dcb/x;
+        $line =~ s/\.thumb/THUMB/x;
+        $line =~ s/\.arm/ARM/x;
+        # The alignment in AREA is the power of two, just as .align in gas
+        $line =~ s/\.text/AREA |.text|, CODE, READONLY, ALIGN=2, CODEALIGN/;
+        $line =~ s/(\s*)(.*)\.rodata/$1AREA |.rodata|, DATA, READONLY, ALIGN=5/;
+
+        $line =~ s/fmxr/vmsr/;
+        $line =~ s/fmrx/vmrs/;
+        $line =~ s/fadds/vadd/;
+    }
+
+    # catch unknown section names that aren't mach-o style (with a comma)
+    if ($as_type =~ /apple-/ and $line =~ /.section ([^,]*)$/) {
+        die ".section $1 unsupported; figure out the mach-o section name and add it";
     }
 
     print ASMFILE $line;
