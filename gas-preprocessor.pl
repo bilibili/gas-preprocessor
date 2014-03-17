@@ -29,6 +29,8 @@ my $as_type = "apple-gas";
 my $fix_unreq = $^O eq "darwin";
 my $force_thumb = 0;
 
+my $arm_cond_codes = "eq|ne|cs|cc|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|hs|lo";
+
 my $usage_str = "
 $0\n
 Gas-preprocessor.pl converts assembler files using modern GNU as syntax for
@@ -601,7 +603,7 @@ foreach my $line (@pass1_lines) {
         my $cond = $3;
         my $label = $4;
         # Don't interpret e.g. bic as b<cc> with ic as conditional code
-        if ($cond =~ /|eq|ne|cs|cc|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|hs|lo/) {
+        if ($cond =~ /|$arm_cond_codes/) {
             if (exists $thumb_labels{$label}) {
                 print ASMFILE ".thumb_func $label\n";
             } else {
@@ -824,7 +826,7 @@ sub handle_serialized_line {
             my $cond = $3;
             my $target = $4;
             # Don't interpret e.g. bic as b<cc> with ic as conditional code
-            if ($cond !~ /|eq|ne|cs|cc|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al|hs|lo/) {
+            if ($cond !~ /|$arm_cond_codes/) {
                 # Not actually a branch
             } elsif ($target =~ /(\d+)([bf])/) {
                 # The target is a local label
