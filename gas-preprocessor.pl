@@ -572,8 +572,8 @@ foreach my $line (@pass1_lines) {
         $thumb_labels{$1}++;
     }
 
-    if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.global)\s+(\w+)/ and
-	$as_type =~ /^-apple/) {
+    if ($as_type =~ /^apple-/ and
+        $line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?|\.global)\s+(\w+)/) {
         my $cond = $3;
         my $label = $4;
         # Don't interpret e.g. bic as b<cc> with ic as conditional code
