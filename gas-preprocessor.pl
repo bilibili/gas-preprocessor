@@ -143,7 +143,7 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
         }
     }
 }
-@preprocess_c_cmd = map { /\.o$/ ? "-" : $_ } @preprocess_c_cmd;
+@preprocess_c_cmd = map { /\.(o|obj)$/ ? "-" : $_ } @preprocess_c_cmd;
 my $tempfile;
 if ($as_type ne "armasm") {
     @gcc_cmd = map { /\.[csS]$/ ? qw(-x assembler -) : $_ } @gcc_cmd;
@@ -165,7 +165,7 @@ if ($as_type ne "armasm") {
     @gcc_cmd = grep ! /^-EHsc$/, @gcc_cmd;
     @gcc_cmd = grep ! /^-O/, @gcc_cmd;
 
-    my @outfiles = grep /\.o$/, @gcc_cmd;
+    my @outfiles = grep /\.(o|obj)$/, @gcc_cmd;
     $tempfile = $outfiles[0].".asm";
 
     # Remove most parameters from gcc_cmd, which actually is the armasm command,
