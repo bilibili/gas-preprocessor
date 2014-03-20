@@ -914,7 +914,8 @@ foreach my $line (@pass1_lines) {
     $line =~ s/\.func/$comm$&/x        if $as_type =~ /^(apple-|clang)/;
     $line =~ s/\.endfunc/$comm$&/x     if $as_type =~ /^(apple-|clang)/;
     $line =~ s/\.endfunc/ENDP/x        if $as_type =~ /armasm/;
-    $line =~ s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang|armasm)/;
+    $line =~ s/\.ltorg/$comm$&/x       if $as_type =~ /^(apple-|clang)/;
+    $line =~ s/\.ltorg/LTORG/x         if $as_type eq "armasm";
     $line =~ s/\.size/$comm$&/x        if $as_type =~ /^(apple-|armasm)/;
     $line =~ s/\.fpu/$comm$&/x         if $as_type =~ /^(apple-|armasm)/;
     $line =~ s/\.arch/$comm$&/x        if $as_type =~ /^(apple-|clang|armasm)/;
