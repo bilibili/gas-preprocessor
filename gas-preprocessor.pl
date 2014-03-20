@@ -605,6 +605,16 @@ my %labels_seen;
 
 my %aarch64_req_alias;
 
+sub is_arm_register {
+    my $name = $_[0];
+    if ($name eq "lr" or
+        $name eq "ip" or
+        $name =~ /^[rav]\d+$/) {
+        return 1;
+    }
+    return 0;
+}
+
 # pass 2
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
@@ -836,9 +846,7 @@ foreach my $line (@pass1_lines) {
                     push(@{$next_temp_labels{$num}}, $name);
                     $line =~ s/$target/$name/;
                 }
-            } elsif ($target ne "lr" and
-                     $target ne "ip" and
-                     $target !~ /^[rav]\d+$/) {
+            } elsif (!is_arm_register($target)) {
                 $call_targets{$target}++;
             }
         }
