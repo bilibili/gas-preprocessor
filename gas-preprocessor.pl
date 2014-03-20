@@ -849,6 +849,10 @@ sub handle_serialized_line {
             } elsif (!is_arm_register($target)) {
                 $call_targets{$target}++;
             }
+        } elsif ($line =~ /^\s*.h?word.*\b\d+[bf]\b/) {
+            while ($line =~ /\b(\d+)([bf])\b/g) {
+                $line = handle_local_label($line, $1, $2);
+            }
         }
 
         # ALIGN in armasm syntax is the actual number of bytes
