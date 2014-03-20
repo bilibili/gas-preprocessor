@@ -844,7 +844,7 @@ foreach my $line (@pass1_lines) {
 
 
         # Check branch instructions
-        if ($line =~ /^\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?)\s+(\w+)/) {
+        if ($line =~ /(?:^|\n)\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?)\s+(\w+)/) {
             my $cond = $3;
             my $target = $4;
             # Don't interpret e.g. bic as b<cc> with ic as conditional code
