@@ -615,6 +615,22 @@ sub is_arm_register {
     return 0;
 }
 
+sub handle_local_label {
+    my $line = $_[0];
+    my $num  = $_[1];
+    my $dir  = $_[2];
+    my $target = "$num$dir";
+    if ($dir eq "b") {
+        $line =~ s/$target/$last_temp_labels{$num}/;
+    } else {
+        my $name = "temp_label_$temp_label_next";
+        $temp_label_next++;
+        push(@{$next_temp_labels{$num}}, $name);
+        $line =~ s/$target/$name/;
+    }
+    return $line;
+}
+
 # pass 2
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
@@ -836,16 +852,7 @@ foreach my $line (@pass1_lines) {
                 # Not actually a branch
             } elsif ($target =~ /(\d+)([bf])/) {
                 # The target is a local label
-                my $num = $1;
-                my $dir = $2;
-                if ($dir eq "b") {
-                    $line =~ s/$target/$last_temp_labels{$num}/;
-                } else {
-                    my $name = "temp_label_$temp_label_next";
-                    $temp_label_next++;
-                    push(@{$next_temp_labels{$num}}, $name);
-                    $line =~ s/$target/$name/;
-                }
+                $line = handle_local_label($line, $1, $2);
             } elsif (!is_arm_register($target)) {
                 $call_targets{$target}++;
             }
