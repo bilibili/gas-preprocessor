@@ -297,7 +297,7 @@ sub handle_if {
 }
 
 sub parse_if_line {
-    my $line = @_[0];
+    my $line = $_[0];
 
     # evaluate .if blocks
     if (scalar(@ifstack)) {
@@ -334,7 +334,7 @@ sub parse_if_line {
 }
 
 sub parse_line {
-    my $line = @_[0];
+    my $line = $_[0];
 
     return if (parse_if_line($line));
 
@@ -397,7 +397,7 @@ sub handle_set {
 }
 
 sub expand_macros {
-    my $line = @_[0];
+    my $line = $_[0];
 
     # handle .if directives; apple's assembler doesn't support important non-basic ones
     # evaluating them is also needed to handle recursive macros
