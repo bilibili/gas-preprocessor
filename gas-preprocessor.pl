@@ -256,7 +256,7 @@ sub eval_expr {
     my $expr = $_[0];
     while ($expr =~ /([A-Za-z._][A-Za-z0-9._]*)/g) {
         my $sym = $1;
-        $expr =~ s/$sym/$symbols{$sym}/ if defined $symbols{$sym};
+        $expr =~ s/$sym/($symbols{$sym})/ if defined $symbols{$sym};
     }
     eval $expr;
 }
