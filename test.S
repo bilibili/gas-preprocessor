@@ -26,3 +26,7 @@ m 0
         mov r3, #42
     .endif
 .endr
+
+.irpc i, 01
+    m \i
+.endr

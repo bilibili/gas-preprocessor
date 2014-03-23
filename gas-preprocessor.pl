@@ -216,6 +216,12 @@ my $macro_count = 0;
 my $altmacro = 0;
 my $in_irp = 0;
 
+my $num_repts;
+my @rept_lines;
+
+my @irp_args;
+my $irp_param;
+
 my @pass1_lines;
 my @ifstack;
 
@@ -327,27 +333,27 @@ sub parse_line {
 
     return if (parse_if_line($line));
 
-    if (/\.macro/) {
-        $macro_level++;
-        if ($macro_level > 1 && !$current_macro) {
-            die "nested macros but we don't have master macro";
+    if (scalar(@rept_lines) == 0) {
+        if (/\.macro/) {
+            $macro_level++;
+            if ($macro_level > 1 && !$current_macro) {
+                die "nested macros but we don't have master macro";
+            }
+        } elsif (/\.endm/) {
+            $macro_level--;
+            if ($macro_level < 0) {
+                die "unmatched .endm";
+            } elsif ($macro_level == 0) {
+                $current_macro = '';
+                return;
+            }
         }
-    } elsif (/\.endm/) {
-        $macro_level--;
-        if ($macro_level < 0) {
-            die "unmatched .endm";
-        } elsif ($macro_level == 0) {
-            $current_macro = '';
-            return;
-        }
-    } elsif (/\.irp/ or /\.rept/) {
-        $in_irp = 1;
-    } elsif (/.endr/) {
-        $in_irp = 0;
     }
 
     if ($macro_level > 1) {
         push(@{$macro_lines{$current_macro}}, $line);
+    } elsif (scalar(@rept_lines) and $line !~ /\.endr/) {
+        push(@rept_lines, $line);
     } elsif ($macro_level == 0) {
         expand_macros($line);
     } else {
@@ -390,7 +396,7 @@ sub expand_macros {
 
     # handle .if directives; apple's assembler doesn't support important non-basic ones
     # evaluating them is also needed to handle recursive macros
-    if (!$in_irp && handle_if($line)) {
+    if (handle_if($line)) {
         return;
     }
 
@@ -415,7 +421,65 @@ sub expand_macros {
 
     handle_set($line);
 
-    if ($line =~ /(\S+:|)\s*([\w\d\.]+)\s*(.*)/ && exists $macro_lines{$2}) {
+    if ($line =~ /\.rept\s+(.*)/) {
+        $num_repts = $1;
+        @rept_lines = ("\n");
+
+        # handle the possibility of repeating another directive on the same line
+        # .endr on the same line is not valid, I don't know if a non-directive is
+        if ($num_repts =~ s/(\.\w+.*)//) {
+            push(@rept_lines, "$1\n");
+        }
+        $num_repts = eval_expr($num_repts);
+    } elsif ($line =~ /\.irp\s+([\d\w\.]+)\s*(.*)/) {
+        $in_irp = 1;
+        $num_repts = 1;
+        @rept_lines = ("\n");
+        $irp_param = $1;
+
+        # only use whitespace as the separator
+        my $irp_arglist = $2;
+        $irp_arglist =~ s/,/ /g;
+        $irp_arglist =~ s/^\s+//;
+        @irp_args = split(/\s+/, $irp_arglist);
+    } elsif ($line =~ /\.irpc\s+([\d\w\.]+)\s*(.*)/) {
+        $in_irp = 1;
+        $num_repts = 1;
+        @rept_lines = ("\n");
+        $irp_param = $1;
+
+        my $irp_arglist = $2;
+        $irp_arglist =~ s/,/ /g;
+        $irp_arglist =~ s/^\s+//;
+        @irp_args = split(//, $irp_arglist);
+    } elsif ($line =~ /\.endr/) {
+        my @prev_rept_lines = @rept_lines;
+        my $prev_in_irp = $in_irp;
+        my @prev_irp_args = @irp_args;
+        my $prev_irp_param = $irp_param;
+        my $prev_num_repts = $num_repts;
+        @rept_lines = ();
+        $in_irp = 0;
+        @irp_args = '';
+
+        if ($prev_in_irp != 0) {
+            foreach my $i (@prev_irp_args) {
+                foreach my $origline (@prev_rept_lines) {
+                    my $line = $origline;
+                    $line =~ s/\\$prev_irp_param/$i/g;
+                    $line =~ s/\\\(\)//g;     # remove \()
+                    parse_line($line);
+                }
+            }
+        } else {
+            for (1 .. $prev_num_repts) {
+                foreach my $origline (@prev_rept_lines) {
+                    my $line = $origline;
+                    parse_line($line);
+                }
+            }
+        }
+    } elsif ($line =~ /(\S+:|)\s*([\w\d\.]+)\s*(.*)/ && exists $macro_lines{$2}) {
         push(@pass1_lines, $1);
         my $macro = $2;
 
@@ -513,8 +577,6 @@ if ($ENV{GASPP_DEBUG}) {
 }
 
 my @sections;
-my $num_repts;
-my @rept_lines;
 
 my %literal_labels;     # for ldr <reg>, =<expr>
 my $literal_num = 0;
@@ -527,9 +589,6 @@ my %thumb_labels;
 my %call_targets;
 my %mov32_targets;
 
-my @irp_args;
-my $irp_param;
-
 my %neon_alias_reg;
 my %neon_alias_type;
 
@@ -541,7 +600,7 @@ my %labels_seen;
 
 my %aarch64_req_alias;
 
-# pass 2: parse .rept and .if variants
+# pass 2
 foreach my $line (@pass1_lines) {
     # handle .previous (only with regard to .section not .subsection)
     if ($line =~ /\.(section|text|const_data)/) {
@@ -625,73 +684,11 @@ foreach my $line (@pass1_lines) {
         }
     }
 
-    if ($line =~ /\.rept\s+(.*)/) {
-        $num_repts = $1;
-        @rept_lines = ("\n");
-
-        # handle the possibility of repeating another directive on the same line
-        # .endr on the same line is not valid, I don't know if a non-directive is
-        if ($num_repts =~ s/(\.\w+.*)//) {
-            push(@rept_lines, "$1\n");
-        }
-        $num_repts = eval_expr($num_repts);
-    } elsif ($line =~ /\.irp\s+([\d\w\.]+)\s*(.*)/) {
-        $in_irp = 1;
-        $num_repts = 1;
-        @rept_lines = ("\n");
-        $irp_param = $1;
-
-        # only use whitespace as the separator
-        my $irp_arglist = $2;
-        $irp_arglist =~ s/,/ /g;
-        $irp_arglist =~ s/^\s+//;
-        @irp_args = split(/\s+/, $irp_arglist);
-    } elsif ($line =~ /\.irpc\s+([\d\w\.]+)\s*(.*)/) {
-        $in_irp = 1;
-        $num_repts = 1;
-        @rept_lines = ("\n");
-        $irp_param = $1;
-
-        my $irp_arglist = $2;
-        $irp_arglist =~ s/,/ /g;
-        $irp_arglist =~ s/^\s+//;
-        @irp_args = split(//, $irp_arglist);
-    } elsif ($line =~ /\.endr/) {
-        if ($in_irp != 0) {
-            foreach my $i (@irp_args) {
-                foreach my $origline (@rept_lines) {
-                    my $line = $origline;
-                    $line =~ s/\\$irp_param/$i/g;
-                    $line =~ s/\\\(\)//g;     # remove \()
-                    handle_serialized_line($line, 1);
-                }
-            }
-        } else {
-            for (1 .. $num_repts) {
-                foreach my $origline (@rept_lines) {
-                    my $line = $origline;
-                    handle_serialized_line($line, 1);
-                }
-            }
-        }
-        @rept_lines = ();
-        $in_irp = 0;
-        @irp_args = '';
-    } elsif (scalar(@rept_lines)) {
-        push(@rept_lines, $line);
-    } else {
-        handle_serialized_line($line, 0);
-    }
+    handle_serialized_line($line);
 }
 
 sub handle_serialized_line {
     my $line = @_[0];
-    my $do_eval_if = @_[1];
-
-    if ($do_eval_if) {
-        return if parse_if_line($line);
-        return if handle_if($line);
-    }
 
     # Strip out the .set lines from the armasm output
     return if (handle_set($line) and $as_type eq "armasm");
