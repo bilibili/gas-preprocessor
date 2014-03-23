@@ -684,23 +684,17 @@ foreach my $line (@pass1_lines) {
         }
     }
 
-    handle_serialized_line($line);
-}
-
-sub handle_serialized_line {
-    my $line = @_[0];
-
     # Strip out the .set lines from the armasm output
-    return if (handle_set($line) and $as_type eq "armasm");
+    next if (handle_set($line) and $as_type eq "armasm");
 
     if ($line =~ /\.unreq\s+(.*)/) {
         if (defined $neon_alias_reg{$1}) {
             delete $neon_alias_reg{$1};
             delete $neon_alias_type{$1};
-            return;
+            next;
         } elsif (defined $aarch64_req_alias{$1}) {
             delete $aarch64_req_alias{$1};
-            return;
+            next;
         }
     }
     # old gas versions store upper and lower case names on .req,
@@ -715,7 +709,7 @@ sub handle_serialized_line {
     if ($line =~ /(\w+)\s+\.(dn|qn)\s+(\w+)(?:\.(\w+))?(\[\d+\])?/) {
         $neon_alias_reg{$1} = "$3$5";
         $neon_alias_type{$1} = $4;
-        return;
+        next;
     }
     if (scalar keys %neon_alias_reg > 0 && $line =~ /^\s+v\w+/) {
         # This line seems to possibly have a neon instruction
@@ -736,7 +730,7 @@ sub handle_serialized_line {
         # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
         if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
             $aarch64_req_alias{$1} = $2;
-            return;
+            next;
         }
         foreach (keys %aarch64_req_alias) {
             my $alias = $_;
@@ -809,7 +803,7 @@ sub handle_serialized_line {
         if ($line =~ s/^(\w+):/$1/) {
             # Skip labels that have already been declared with a PROC,
             # labels must not be declared multiple times.
-            return if (defined $labels_seen{$1});
+            next if (defined $labels_seen{$1});
             $labels_seen{$1} = 1;
         } elsif ($line !~ /(\w+) PROC/) {
             # If not a label, make sure the line starts with whitespace,
