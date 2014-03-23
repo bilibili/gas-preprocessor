@@ -301,21 +301,26 @@ sub parse_if_line {
 
     # evaluate .if blocks
     if (scalar(@ifstack)) {
-        if ($line =~ /\.endif/) {
-            pop(@ifstack);
-            return 1;
-        } elsif ($line =~ /\.elseif\s+(.*)/) {
-            if ($ifstack[-1] == 0) {
-                $ifstack[-1] = !!eval_expr($1);
-            } elsif ($ifstack[-1] > 0) {
-                $ifstack[-1] = -$ifstack[-1];
+        # Don't evaluate any new if statements if we're within
+        # a repetition or macro - they will be evaluated once
+        # the repetition is unrolled or the macro is expanded.
+        if (scalar(@rept_lines) == 0 and $macro_level == 0) {
+            if ($line =~ /\.endif/) {
+                pop(@ifstack);
+                return 1;
+            } elsif ($line =~ /\.elseif\s+(.*)/) {
+                if ($ifstack[-1] == 0) {
+                    $ifstack[-1] = !!eval_expr($1);
+                } elsif ($ifstack[-1] > 0) {
+                    $ifstack[-1] = -$ifstack[-1];
+                }
+                return 1;
+            } elsif ($line =~ /\.else/) {
+                $ifstack[-1] = !$ifstack[-1];
+                return 1;
+            } elsif (handle_if($line)) {
+                return 1;
             }
-            return 1;
-        } elsif ($line =~ /\.else/) {
-            $ifstack[-1] = !$ifstack[-1];
-            return 1;
-        } elsif (handle_if($line)) {
-            return 1;
         }
 
         # discard lines in false .if blocks

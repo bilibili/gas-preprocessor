@@ -30,3 +30,21 @@ m 0
 .irpc i, 01
     m \i
 .endr
+
+.macro outer
+    .macro inner
+        .if VAR1 > 10
+            mov r4, #42
+        .endif
+    .endm
+
+    .set VAR1, 5
+    inner
+    .set VAR1, 15
+    inner
+    .purgem inner
+.endm
+
+.if 2 > 1
+    outer
+.endif
