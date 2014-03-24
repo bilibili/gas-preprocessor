@@ -66,3 +66,9 @@ argtest2 1, 2, 3
 argtest2 1 2 3
 argtest1 1 2 3 + 1
 argtest2 1 2 < 1 3
+
+.irpc i, 0123
+    .irpc j, 0123
+        mov r\i, #\j
+    .endr
+.endr

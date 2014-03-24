@@ -221,6 +221,7 @@ if ($ENV{GASPP_DEBUG}) {
 
 my $current_macro = '';
 my $macro_level = 0;
+my $rept_level = 0;
 my %macro_lines;
 my %macro_args;
 my %macro_args_default;
@@ -384,9 +385,17 @@ sub parse_line {
         }
     }
 
+    if ($macro_level == 0) {
+        if ($line =~ /\.(rept|irp)/) {
+            $rept_level++;
+        } elsif ($line =~ /.endr/) {
+            $rept_level--;
+        }
+    }
+
     if ($macro_level > 1) {
         push(@{$macro_lines{$current_macro}}, $line);
-    } elsif (scalar(@rept_lines) and $line !~ /\.endr/) {
+    } elsif (scalar(@rept_lines) and $rept_level >= 1) {
         push(@rept_lines, $line);
     } elsif ($macro_level == 0) {
         expand_macros($line);
