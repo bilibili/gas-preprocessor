@@ -48,3 +48,21 @@ m 0
 .if 2 > 1
     outer
 .endif
+
+.macro argtest1 first, second, third
+    mov r0, #\first
+    mov r0, #\second
+    mov r0, #\third
+.endm
+.macro argtest2 first second third
+    mov r1, #\first
+    mov r1, #\second
+    mov r1, #\third
+.endm
+
+argtest1 1, 2, 3
+argtest1 1 2 3
+argtest2 1, 2, 3
+argtest2 1 2 3
+argtest1 1 2 3 + 1
+argtest2 1 2 < 1 3
