@@ -72,3 +72,14 @@ argtest2 1 2 < 1 3
         mov r\i, #\j
     .endr
 .endr
+
+.macro alttest param
+    .if param < 10
+        mov r0, #param
+    .endif
+.endm
+
+.altmacro
+alttest 5
+alttest 15
+.noaltmacro

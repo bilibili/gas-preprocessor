@@ -600,6 +600,11 @@ sub expand_macros {
             foreach (reverse sort {length $a <=> length $b} keys %replacements) {
                 $macro_line =~ s/\\$_/$replacements{$_}/g;
             }
+            if ($altmacro) {
+                foreach (reverse sort {length $a <=> length $b} keys %replacements) {
+                    $macro_line =~ s/\b$_\b/$replacements{$_}/g;
+                }
+            }
             $macro_line =~ s/\\\@/$count/g;
             $macro_line =~ s/\\\(\)//g;     # remove \()
             parse_line($macro_line);
