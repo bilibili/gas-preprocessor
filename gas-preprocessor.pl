@@ -589,7 +589,7 @@ foreach my $line (@pass1_lines) {
     # mach-o local symbol names start with L (no dot)
     $line =~ s/(?<!\w)\.(L\w+)/$1/g;
 
-    # recycle the commented '.func' directive for '.thumb_func'
+    # recycle the '.func' directive for '.thumb_func'
     if ($thumb and $as_type =~ /^apple-/) {
         $line =~ s/\.func/.thumb_func/x;
     }
