@@ -207,7 +207,17 @@ $comm = ";" if $as_type =~ /armasm/;
 my %ppc_spr = (ctr    => 9,
                vrsave => 256);
 
-open(ASMFILE, "-|", @preprocess_c_cmd) || die "Error running preprocessor";
+open(INPUT, "-|", @preprocess_c_cmd) || die "Error running preprocessor";
+
+if ($ENV{GASPP_DEBUG}) {
+    open(ASMFILE, ">&STDOUT");
+} else {
+    if ($as_type ne "armasm") {
+        open(ASMFILE, "|-", @gcc_cmd) or die "Error running assembler";
+    } else {
+        open(ASMFILE, ">", $tempfile);
+    }
+}
 
 my $current_macro = '';
 my $macro_level = 0;
@@ -224,10 +234,33 @@ my @rept_lines;
 my @irp_args;
 my $irp_param;
 
-my @pass1_lines;
 my @ifstack;
 
 my %symbols;
+
+my @sections;
+
+my %literal_labels;     # for ldr <reg>, =<expr>
+my $literal_num = 0;
+my $literal_expr = ".word";
+$literal_expr = ".quad" if $arch eq "aarch64";
+
+my $thumb = 0;
+
+my %thumb_labels;
+my %call_targets;
+my %mov32_targets;
+
+my %neon_alias_reg;
+my %neon_alias_type;
+
+my $temp_label_next = 0;
+my %last_temp_labels;
+my %next_temp_labels;
+
+my %labels_seen;
+
+my %aarch64_req_alias;
 
 if ($force_thumb) {
     parse_line(".thumb\n");
@@ -236,7 +269,7 @@ if ($force_thumb) {
 # pass 1: parse .macro
 # note that the handling of arguments is probably overly permissive vs. gas
 # but it should be the same for valid cases
-while (<ASMFILE>) {
+while (<INPUT>) {
     # remove all comments (to avoid interfering with evaluating directives)
     s/(?<!\\)$inputcomm.*//x;
     # Strip out windows linefeeds
@@ -420,7 +453,8 @@ sub expand_macros {
 
     $line =~ s/\%([^,]*)/eval_expr($1)/eg if $altmacro;
 
-    handle_set($line);
+    # Strip out the .set lines from the armasm output
+    return if (handle_set($line) and $as_type eq "armasm");
 
     if ($line =~ /\.rept\s+(.*)/) {
         $num_repts = $1;
@@ -481,7 +515,7 @@ sub expand_macros {
             }
         }
     } elsif ($line =~ /(\S+:|)\s*([\w\d\.]+)\s*(.*)/ && exists $macro_lines{$2}) {
-        push(@pass1_lines, $1);
+        handle_serialized_line($1);
         my $macro = $2;
 
         # commas are optional here too, but are syntactically important because
@@ -562,44 +596,9 @@ sub expand_macros {
             parse_line($macro_line);
         }
     } else {
-        push(@pass1_lines, $line);
+        handle_serialized_line($line);
     }
 }
-
-close(ASMFILE) or exit 1;
-if ($ENV{GASPP_DEBUG}) {
-    open(ASMFILE, ">&STDOUT");
-} else {
-    if ($as_type ne "armasm") {
-        open(ASMFILE, "|-", @gcc_cmd) or die "Error running assembler";
-    } else {
-        open(ASMFILE, ">", $tempfile);
-    }
-}
-
-my @sections;
-
-my %literal_labels;     # for ldr <reg>, =<expr>
-my $literal_num = 0;
-my $literal_expr = ".word";
-$literal_expr = ".quad" if $arch eq "aarch64";
-
-my $thumb = 0;
-
-my %thumb_labels;
-my %call_targets;
-my %mov32_targets;
-
-my %neon_alias_reg;
-my %neon_alias_type;
-
-my $temp_label_next = 0;
-my %last_temp_labels;
-my %next_temp_labels;
-
-my %labels_seen;
-
-my %aarch64_req_alias;
 
 sub is_arm_register {
     my $name = $_[0];
@@ -627,8 +626,9 @@ sub handle_local_label {
     return $line;
 }
 
-# pass 2
-foreach my $line (@pass1_lines) {
+sub handle_serialized_line {
+    my $line = $_[0];
+
     # handle .previous (only with regard to .section not .subsection)
     if ($line =~ /\.(section|text|const_data)/) {
         push(@sections, $line);
@@ -711,17 +711,14 @@ foreach my $line (@pass1_lines) {
         }
     }
 
-    # Strip out the .set lines from the armasm output
-    next if (handle_set($line) and $as_type eq "armasm");
-
     if ($line =~ /\.unreq\s+(.*)/) {
         if (defined $neon_alias_reg{$1}) {
             delete $neon_alias_reg{$1};
             delete $neon_alias_type{$1};
-            next;
+            return;
         } elsif (defined $aarch64_req_alias{$1}) {
             delete $aarch64_req_alias{$1};
-            next;
+            return;
         }
     }
     # old gas versions store upper and lower case names on .req,
@@ -736,7 +733,7 @@ foreach my $line (@pass1_lines) {
     if ($line =~ /(\w+)\s+\.(dn|qn)\s+(\w+)(?:\.(\w+))?(\[\d+\])?/) {
         $neon_alias_reg{$1} = "$3$5";
         $neon_alias_type{$1} = $4;
-        next;
+        return;
     }
     if (scalar keys %neon_alias_reg > 0 && $line =~ /^\s+v\w+/) {
         # This line seems to possibly have a neon instruction
@@ -757,7 +754,7 @@ foreach my $line (@pass1_lines) {
         # clang's integrated aarch64 assembler in Xcode 5 does not support .req/.unreq
         if ($line =~ /\b(\w+)\s+\.req\s+(\w+)\b/) {
             $aarch64_req_alias{$1} = $2;
-            next;
+            return;
         }
         foreach (keys %aarch64_req_alias) {
             my $alias = $_;
@@ -830,7 +827,7 @@ foreach my $line (@pass1_lines) {
         if ($line =~ s/^(\w+):/$1/) {
             # Skip labels that have already been declared with a PROC,
             # labels must not be declared multiple times.
-            next if (defined $labels_seen{$1});
+            return if (defined $labels_seen{$1});
             $labels_seen{$1} = 1;
         } elsif ($line !~ /(\w+) PROC/) {
             # If not a label, make sure the line starts with whitespace,
@@ -986,6 +983,7 @@ if ($as_type ne "armasm") {
     print ASMFILE "\tEND\n";
 }
 
+close(INPUT) or exit 1;
 close(ASMFILE) or exit 1;
 if ($as_type eq "armasm" and ! defined $ENV{GASPP_DEBUG}) {
     system(@gcc_cmd) == 0 or die "Error running assembler";
