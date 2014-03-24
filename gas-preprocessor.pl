@@ -201,6 +201,8 @@ die "Unknown target architecture '$arch'" if not exists $canonical_arch{$arch};
 
 $arch = $canonical_arch{$arch};
 $comm = $comments{$arch};
+my $inputcomm = $comm;
+$comm = ";" if $as_type =~ /armasm/;
 
 my %ppc_spr = (ctr    => 9,
                vrsave => 256);
@@ -236,7 +238,7 @@ if ($force_thumb) {
 # but it should be the same for valid cases
 while (<ASMFILE>) {
     # remove all comments (to avoid interfering with evaluating directives)
-    s/(?<!\\)$comm.*//x;
+    s/(?<!\\)$inputcomm.*//x;
     # Strip out windows linefeeds
     s/\r$//;
     # Strip out line number comments - armasm can handle them in a separate
@@ -245,8 +247,6 @@ while (<ASMFILE>) {
 
     parse_line($_);
 }
-
-$comm = ";" if $as_type =~ /armasm/;
 
 sub eval_expr {
     my $expr = $_[0];
