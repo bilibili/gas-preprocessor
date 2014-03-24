@@ -616,12 +616,12 @@ sub handle_local_label {
     my $dir  = $_[2];
     my $target = "$num$dir";
     if ($dir eq "b") {
-        $line =~ s/$target/$last_temp_labels{$num}/;
+        $line =~ s/$target/$last_temp_labels{$num}/g;
     } else {
         my $name = "temp_label_$temp_label_next";
         $temp_label_next++;
         push(@{$next_temp_labels{$num}}, $name);
-        $line =~ s/$target/$name/;
+        $line =~ s/$target/$name/g;
     }
     return $line;
 }
