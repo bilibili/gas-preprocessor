@@ -837,15 +837,18 @@ sub handle_serialized_line {
 
 
         # Check branch instructions
-        if ($line =~ /(?:^|\n)\s*((\w+\s*:\s*)?bl?x?(..)?(?:\.w)?)\s+(\w+)/) {
+        if ($line =~ /(?:^|\n)\s*(\w+\s*:\s*)?(bl?x?(..)?(\.w)?)\s+(\w+)/) {
+            my $instr = $2;
             my $cond = $3;
-            my $target = $4;
+            my $width = $4;
+            my $target = $5;
             # Don't interpret e.g. bic as b<cc> with ic as conditional code
             if ($cond !~ /|$arm_cond_codes/) {
                 # Not actually a branch
             } elsif ($target =~ /(\d+)([bf])/) {
                 # The target is a local label
                 $line = handle_local_label($line, $1, $2);
+                $line =~ s/\b$instr\b/$&.w/ if $width eq "";
             } elsif (!is_arm_register($target)) {
                 $call_targets{$target}++;
             }
