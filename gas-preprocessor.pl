@@ -243,10 +243,6 @@ while (<ASMFILE>) {
     # syntax, but since the line numbers are off they are only misleading.
     s/^#\s+(\d+).*//          if $as_type =~ /armasm/;
 
-    # armasm uses a different comment character. We don't want to change
-    # $comm originally since that matches what the input source uses.
-    s/$comm/;/                if $as_type =~ /armasm/;
-
     parse_line($_);
 }
 
