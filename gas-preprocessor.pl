@@ -803,6 +803,10 @@ sub handle_serialized_line {
                 $line =~ s/\b(saddl2?)(\s+v[0-3]?\d\.(\w+))\b/$1.$3$2/;
                 $line =~ s/\b(v[0-3]?\d)\.\w+\b/$1/g;
             }
+            if ($line =~ /^\s*dup\b.*\]$/) {
+                $line =~ s/\bdup(\s+v[0-3]?\d)\.(\w+)\b/dup.$2$1/g;
+                $line =~ s/\b(v[0-3]?\d)\.[bhsdBHSD](\[\d\])$/$1$2/g;
+            }
         }
     }
 
