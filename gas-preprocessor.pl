@@ -18,7 +18,6 @@ my %comments = ("aarch64" => '//',
                 "arm"     => '@',
                 "powerpc" => '#');
 
-my @options;
 my @gcc_cmd;
 my @preprocess_c_cmd;
 
@@ -57,44 +56,28 @@ sub usage() {
 
 while (@ARGV) {
     my $opt = shift;
-    last if ($opt =~ /^--$/);
-    push @options, $opt;
-}
-if (@ARGV) {
-    @gcc_cmd = @ARGV;
-} else {
-    @gcc_cmd = @options;
-    @options = ();
 
-    # backward compatible handling
-    if ($gcc_cmd[0] eq "-fix-unreq") {
-        $fix_unreq = 1;
-        shift @gcc_cmd;
-    } elsif ($gcc_cmd[0] eq "-no-fix-unreq") {
-        $fix_unreq = 0;
-        shift @gcc_cmd;
-    }
-}
-
-while (@options) {
-    my $opt = shift @options;
     if ($opt =~ /^-(no-)?fix-unreq$/) {
         $fix_unreq = $1 ne "no-";
     } elsif ($opt eq "-force-thumb") {
         $force_thumb = 1;
     } elsif ($opt eq "-arch") {
-        $arch = shift @options;
+        $arch = shift;
         die "unknown arch: '$arch'\n" if not exists $comments{$arch};
     } elsif ($opt eq "-as-type") {
-        $as_type = shift @options;
+        $as_type = shift;
         die "unknown as type: '$as_type'\n" if $as_type !~ /^((apple-)?(gas|clang)|armasm)$/;
     } elsif ($opt eq "-help") {
         usage();
         exit 0;
+    } elsif ($opt eq "--" ) {
+	@gcc_cmd = @ARGV;
+    } elsif ($opt =~ /^-/) {
+        die "option '$opt' is not known. See '$0 -help' for usage information\n";
     } else {
-        usage();
-        die "option '$opt' is not known\n";
+	push @gcc_cmd, $opt, @ARGV;
     }
+    last if (@gcc_cmd);
 }
 
 if (grep /\.c$/, @gcc_cmd) {
