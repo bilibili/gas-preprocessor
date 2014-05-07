@@ -126,7 +126,17 @@ if ((grep /^-c$/, @gcc_cmd) && !(grep /^-o/, @gcc_cmd)) {
         }
     }
 }
-@preprocess_c_cmd = map { /\.(o|obj)$/ ? "-" : $_ } @preprocess_c_cmd;
+# replace only the '-o' argument with '-', avoids rewriting the make dependency
+# target specified with -MT to '-'
+my $index = 1;
+while ($index < $#preprocess_c_cmd) {
+    if ($preprocess_c_cmd[$index] eq "-o") {
+        $index++;
+        $preprocess_c_cmd[$index] = "-";
+    }
+    $index++;
+}
+
 my $tempfile;
 if ($as_type ne "armasm") {
     @gcc_cmd = map { /\.[csS]$/ ? qw(-x assembler -) : $_ } @gcc_cmd;
