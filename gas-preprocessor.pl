@@ -788,6 +788,14 @@ sub handle_serialized_line {
         if ($line =~ /^\s*(s|u)xtl(2)?\s+(v[0-3]?\d\.[248][hsdHSD])\s*,\s*(v[0-3]?\d\.(?:2|4|8|16)[bhsBHS])\b\s*$/) {
             $line = "        $1shll$2 $3, $4, #0\n";
         }
+        # clang 3.4 does not automatically use shifted immediates in add/sub
+        if ($as_type eq "clang" and
+            $line =~ /^(\s*(?:add|sub)s?) ([^#l]+)#([\d\+\-\*\/ <>]+)\s*$/) {
+            my $imm = eval $3;
+            if ($imm > 4095 and not ($imm & 4095)) {
+                $line = "$1 $2#" . ($imm >> 12) . ", lsl #12\n";
+            }
+        }
         if ($ENV{GASPP_FIX_XCODE5}) {
             if ($line =~ /^\s*bsl\b/) {
                 $line =~ s/\b(bsl)(\s+v[0-3]?\d\.(\w+))\b/$1.$3$2/;
