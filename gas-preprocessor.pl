@@ -783,9 +783,10 @@ sub handle_serialized_line {
         if ($line =~ /^\s*movi\s+(v[0-3]?\d\.(?:2|4|8)[hsHS])\s*,\s*(#\w+)\b\s*$/) {
             $line = "        movi $1, $2, lsl #0\n";
         }
-        # Xcode 5 misses the alias uxtl replace it with the more general ushll
-        if ($line =~ /^\s*uxtl(2)?\s+(v[0-3]?\d\.[248][hsdHSD])\s*,\s*(v[0-3]?\d\.(?:4|8|16)[bhsBHS])\b\s*$/) {
-            $line = "        ushll$1 $2, $3, #0\n";
+        # Xcode 5 misses the alias uxtl. Replace it with the more general ushll.
+        # Clang 3.4 misses the alias sxtl too. Replace it with the more general sshll.
+        if ($line =~ /^\s*(s|u)xtl(2)?\s+(v[0-3]?\d\.[248][hsdHSD])\s*,\s*(v[0-3]?\d\.(?:2|4|8|16)[bhsBHS])\b\s*$/) {
+            $line = "        $1shll$2 $3, $4, #0\n";
         }
         if ($ENV{GASPP_FIX_XCODE5}) {
             if ($line =~ /^\s*bsl\b/) {
