@@ -668,9 +668,9 @@ sub handle_serialized_line {
     }
 
     # handle GNU as pc-relative relocations for adrp/add
-    if ($line =~ /(.*)\s*adrp([\w\s\d]+)\s*,\s*#:pg_hi21:([^\s]+)/) {
+    if ($line =~ /(.*)\s*adrp([\w\s\d]+)\s*,\s*#?:pg_hi21:([^\s]+)/) {
         $line = "$1 adrp$2, ${3}\@PAGE\n";
-    } elsif ($line =~ /(.*)\s*add([\w\s\d]+)\s*,([\w\s\d]+)\s*,\s*#:lo12:([^\s]+)/) {
+    } elsif ($line =~ /(.*)\s*add([\w\s\d]+)\s*,([\w\s\d]+)\s*,\s*#?:lo12:([^\s]+)/) {
         $line = "$1 add$2, $3, ${4}\@PAGEOFF\n";
     }
 
