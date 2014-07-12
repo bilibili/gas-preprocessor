@@ -829,7 +829,7 @@ sub handle_serialized_line {
             $labels_seen{$1} = 1;
         }
 
-        if ($line =~ s/^(\d+)://) {
+        if ($line =~ s/^\s*(\d+)://) {
             # Convert local labels into unique labels. armasm (at least in
             # RVCT) has something similar, but still different enough.
             # By converting to unique labels we avoid any possible
