@@ -272,7 +272,12 @@ while (<INPUT>) {
     # syntax, but since the line numbers are off they are only misleading.
     s/^#\s+(\d+).*//          if $as_type =~ /armasm/;
 
-    parse_line($_);
+    foreach my $subline (split(";", $_)) {
+        # Add newlines at the end of lines that don't already have one
+        chomp $subline;
+        $subline .= "\n";
+        parse_line($subline);
+    }
 }
 
 sub eval_expr {
