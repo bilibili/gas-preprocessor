@@ -990,7 +990,7 @@ sub handle_serialized_line {
 
         $line =~ s/fmxr/vmsr/;
         $line =~ s/fmrx/vmrs/;
-        $line =~ s/fadds/vadd/;
+        $line =~ s/fadds/vadd.f32/;
     }
 
     # catch unknown section names that aren't mach-o style (with a comma)
