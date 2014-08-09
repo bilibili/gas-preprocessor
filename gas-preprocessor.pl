@@ -264,13 +264,15 @@ if ($force_thumb) {
 # note that the handling of arguments is probably overly permissive vs. gas
 # but it should be the same for valid cases
 while (<INPUT>) {
+    # remove lines starting with '#', preprocessing is done, '#' at start of
+    # the line indicates a comment for all supported archs (aarch64, arm, ppc
+    # and x86). Also strips line number comments but since they are off anyway
+    # it is no loss.
+    s/^#.*$//;
     # remove all comments (to avoid interfering with evaluating directives)
     s/(?<!\\)$inputcomm.*//x;
     # Strip out windows linefeeds
     s/\r$//;
-    # Strip out line number comments - armasm can handle them in a separate
-    # syntax, but since the line numbers are off they are only misleading.
-    s/^#\s+(\d+).*//          if $as_type =~ /armasm/;
 
     foreach my $subline (split(";", $_)) {
         # Add newlines at the end of lines that don't already have one
