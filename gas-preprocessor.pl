@@ -97,6 +97,8 @@ if (grep /\.c$/, @gcc_cmd) {
 if ($as_type eq "armasm") {
 
     $preprocess_c_cmd[0] = "cpp";
+    push(@preprocess_c_cmd, "-U__ELF__");
+    push(@preprocess_c_cmd, "-U__MACH__");
 
     @preprocess_c_cmd = grep ! /^-nologo$/, @preprocess_c_cmd;
     # Remove -ignore XX parameter pairs from preprocess_c_cmd
