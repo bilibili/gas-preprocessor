@@ -59,6 +59,12 @@ m 0
     mov r1, #\second
     mov r1, #\third
 .endm
+# test for comma between macro name and first parameter
+.macro argtest3, first, second, third
+    mov r0, #\first
+    mov r0, #\second
+    mov r0, #\third
+.endm
 
 argtest1 1, 2, 3
 argtest1 1 2 3
@@ -66,6 +72,9 @@ argtest2 1, 2, 3
 argtest2 1 2 3
 argtest1 1 2 3 + 1
 argtest2 1 2 < 1 3
+argtest3 1, 2, 3
+argtest3 1 2 3
+argtest3 1 2 6 / 2
 
 .irpc i, 0123
     .irpc j, 0123
