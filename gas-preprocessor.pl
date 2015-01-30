@@ -893,7 +893,7 @@ sub handle_serialized_line {
             $line =~ s/\.align\s(\d+)/ALIGN $align/;
         }
         # Convert gas style [r0, :128] into armasm [r0@128] alignment specification
-        $line =~ s/\[([^\[]+),\s*:(\d+)\]/[$1\@$2]/g;
+        $line =~ s/\[([^\[,]+),?\s*:(\d+)\]/[$1\@$2]/g;
 
         # armasm treats logical values {TRUE} and {FALSE} separately from
         # numeric values - logical operators and values can't be intermixed
