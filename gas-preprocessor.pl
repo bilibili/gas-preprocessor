@@ -930,7 +930,7 @@ sub handle_serialized_line {
         # Misc bugs/deficiencies:
         # armasm seems unable to parse e.g. "vmov s0, s1" without a type
         # qualifier, thus add .f32.
-        $line =~ s/^(\s+(?:vmov|vadd))(\s+s)/$1.f32$2/;
+        $line =~ s/^(\s+(?:vmov|vadd))(\s+s\d+\s*,\s*s\d+)/$1.f32$2/;
         # armasm is unable to parse &0x - add spacing
         $line =~ s/&0x/& 0x/g;
     }
