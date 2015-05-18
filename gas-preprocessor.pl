@@ -63,7 +63,7 @@ while (@ARGV) {
         $force_thumb = 1;
     } elsif ($opt eq "-arch") {
         $arch = shift;
-        die "unknown arch: '$arch'\n" if not exists $comments{$arch};
+        die "unknown arch: '$arch'\n" if not exists $canonical_arch{$arch};
     } elsif ($opt eq "-as-type") {
         $as_type = shift;
         die "unknown as type: '$as_type'\n" if $as_type !~ /^((apple-)?(gas|clang)|armasm)$/;
