@@ -939,7 +939,7 @@ sub handle_serialized_line {
         # Convert register post indexing to a separate add instruction.
         # This converts e.g. "ldr r0, [r1], r2" into "ldr r0, [r1]",
         # "add r1, r1, r2".
-        $line =~ s/(ldr|str)\s+(\w+),\s*\[(\w+)\],\s*(\w+)/$1 $2, [$3]\n\tadd $3, $3, $4/g;
+        $line =~ s/((?:ldr|str)[bh]?)\s+(\w+),\s*\[(\w+)\],\s*(\w+)/$1 $2, [$3]\n\tadd $3, $3, $4/g;
 
         # Convert "mov pc, lr" into "bx lr", since the former only works
         # for switching from arm to thumb (and only in armv7), but not
