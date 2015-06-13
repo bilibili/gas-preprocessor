@@ -946,9 +946,10 @@ sub handle_serialized_line {
         # from thumb to arm.
         s/mov\s*pc\s*,\s*lr/bx lr/g;
 
-        # Convert stmdb/ldmia with only one register into a plain str/ldr with post-increment/decrement
-        $line =~ s/stmdb\s+sp!\s*,\s*\{([^,-]+)\}/str $1, [sp, #-4]!/g;
-        $line =~ s/ldmia\s+sp!\s*,\s*\{([^,-]+)\}/ldr $1, [sp], #4/g;
+        # Convert stmdb/ldmia/stmfd/ldmfd/ldm with only one register into a plain str/ldr with post-increment/decrement.
+        # Wide thumb2 encoding requires at least two registers in register list while all other encodings support one register too.
+        $line =~ s/stm(?:db|fd)\s+sp!\s*,\s*\{([^,-]+)\}/str $1, [sp, #-4]!/g;
+        $line =~ s/ldm(?:ia|fd)?\s+sp!\s*,\s*\{([^,-]+)\}/ldr $1, [sp], #4/g;
 
         $line =~ s/\.arm/.thumb/x;
     }
