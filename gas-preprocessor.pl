@@ -992,6 +992,7 @@ sub handle_serialized_line {
         # The alignment in AREA is the power of two, just as .align in gas
         $line =~ s/\.text/AREA |.text|, CODE, READONLY, ALIGN=4, CODEALIGN/;
         $line =~ s/(\s*)(.*)\.rodata/$1AREA |.rodata|, DATA, READONLY, ALIGN=5/;
+        $line =~ s/\.data/AREA |.data|, DATA, ALIGN=5/;
 
         $line =~ s/fmxr/vmsr/;
         $line =~ s/fmrx/vmrs/;
