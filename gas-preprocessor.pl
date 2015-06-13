@@ -888,9 +888,9 @@ sub handle_serialized_line {
         }
 
         # ALIGN in armasm syntax is the actual number of bytes
-        if ($line =~ /\.align\s+(\d+)/) {
+        if ($line =~ /\.(?:p2)?align\s+(\d+)/) {
             my $align = 1 << $1;
-            $line =~ s/\.align\s(\d+)/ALIGN $align/;
+            $line =~ s/\.(?:p2)?align\s(\d+)/ALIGN $align/;
         }
         # Convert gas style [r0, :128] into armasm [r0@128] alignment specification
         $line =~ s/\[([^\[,]+),?\s*:(\d+)\]/[$1\@$2]/g;
