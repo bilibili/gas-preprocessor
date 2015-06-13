@@ -429,7 +429,7 @@ sub parse_line {
 
 sub handle_set {
     my $line = $_[0];
-    if ($line =~ /\.set\s+(.*),\s*(.*)/) {
+    if ($line =~ /\.set\s+(\S*)\s*,\s*(.*)/) {
         $symbols{$1} = eval_expr($2);
         return 1;
     }
