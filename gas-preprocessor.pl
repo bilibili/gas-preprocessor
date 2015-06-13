@@ -874,7 +874,7 @@ sub handle_serialized_line {
             # Don't interpret e.g. bic as b<cc> with ic as conditional code
             if ($cond !~ /|$arm_cond_codes/) {
                 # Not actually a branch
-            } elsif ($target =~ /(\d+)([bf])/) {
+            } elsif ($target =~ /^(\d+)([bf])$/) {
                 # The target is a local label
                 $line = handle_local_label($line, $1, $2);
                 $line =~ s/\b$instr\b/$&.w/ if $width eq "";
