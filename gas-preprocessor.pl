@@ -987,6 +987,9 @@ sub handle_serialized_line {
         $line =~ s/\.word/dcd/x;
         $line =~ s/\.short/dcw/x;
         $line =~ s/\.byte/dcb/x;
+        $line =~ s/\.quad/dcq/x;
+        $line =~ s/\.ascii/dcb/x;
+        $line =~ s/\.asciz(.*)$/dcb\1,0/x;
         $line =~ s/\.thumb/THUMB/x;
         $line =~ s/\.arm/ARM/x;
         # The alignment in AREA is the power of two, just as .align in gas
