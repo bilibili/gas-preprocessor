@@ -979,6 +979,9 @@ sub handle_serialized_line {
         $line =~ s/\.int/.long/x;
         $line =~ s/\.float/.single/x;
     }
+    if ($as_type eq "apple-gas") {
+        $line =~ s/vmrs\s+APSR_nzcv/fmrx r15/x;
+    }
     if ($as_type eq "armasm") {
         $line =~ s/\.global/EXPORT/x;
         $line =~ s/\.int/dcd/x;
